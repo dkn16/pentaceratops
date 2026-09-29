@@ -4,7 +4,7 @@ Statistical validation of transiting planet candidates using competing planet
 and eclipsing-binary scenarios, real-space or Fourier-space likelihoods, and
 persistent sampling.
 
-**Development version: `0.1.0.dev2`.** The standalone numerical engines,
+**Development version: `0.1.0.dev3`.** The standalone numerical engines,
 posterior recording, preprocessing utilities, and experimental CPU-batching
 adapters are implemented. The corrected end-to-end research pipelines are not
 fully integrated yet: a bare `Target.calc_probs(...)` call is **not** a
@@ -29,9 +29,12 @@ access services and download data. Set its `lightkurve_cache_dir` explicitly
 to a scratch location.
 
 The package declares Python >=3.10; the tested environment uses Python 3.13.
-PyTransit is currently constrained to 2.6, with setuptools below 81 for its
-`pkg_resources` dependency. See [development](docs/development.md) for build
-instructions and compatibility limits.
+The package now targets PyTransit **2.9.2** and MeepMeep **1.1.x**, with matching
+scalar and fast orbital calculations. The old runtime setuptools restriction
+is removed. NumPy is temporarily limited to `>=2.0,<2.3` while inherited scalar
+conversion deprecations remain. Use a separate development environment, not an
+in-place upgrade of a frozen research run. See the [upgrade notes](docs/pytransit.md)
+and [development](docs/development.md) for tests and compatibility limits.
 
 ## Download and preprocess a candidate
 
@@ -236,10 +239,12 @@ is ignored by Git and packaging.
 
 ## Tests and provenance
 
-The `0.1.0.dev2` wheel passed **167 tests** on 2026-09-29, including preserved
-engine comparisons, result save/load, scalar/fast exposure regressions, and
-28 download/preparation tests. Live NASA lookups and one-product downloads
-for both missions, plus an optional Bayesian TESS lookup, also succeeded.
+The `0.1.0.dev3` wheel passed **194 tests** on 2026-09-29 with PyTransit 2.9.2,
+including preserved-engine comparisons, result save/load, scalar/fast exposure
+regressions, and download/preparation tests. A separate 240-template
+old/new-dependency comparison is recorded in the [upgrade notes](docs/pytransit.md).
+Earlier live NASA lookups and one-product downloads for both missions, plus
+an optional Bayesian TESS lookup, also succeeded.
 This is not yet full corrected benchmark equivalence or a multi-version CI
 matrix. See the [validation record](docs/validation.md).
 

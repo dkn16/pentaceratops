@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Exact native-exposure averages without full native model arrays.
 
-Uses PyTransit's GPL-3.0-or-later quadratic/orbit routines and the same
+Uses PyTransit 2.9's quadratic and MeepMeep orbital routines and the same
 midpoint exposure-integration rule and evaluation window as its
 quadratic_model_s/v routines. The caller supplies the positive integer
 subsample count; the adapter default is 20.
@@ -9,28 +9,32 @@ Support/finite checks and interval selection deliberately do NOT use fastmath.
 """
 import numpy as np
 from numba import njit
-from pytransit.models.numba.ma_quadratic_nb import eval_quad_z_s
-from pytransit.orbits.taylor_z import vajs_from_paiew, z_taylor_st, t14
+from pytransit.models.numba.ma_quadratic_nb import (
+    eval_quad_z_s, solve2d, sep_c, bounding_box,
+)
 
 
 @njit(cache=True, fastmath=False)
 def orbit_setup(parameters):
     # Parameters: k,t0,period,a/Rstar,inclination,eccentricity,w,u1,u2,amplitude.
     n = len(parameters)
-    coefficients = np.empty((n, 9))
-    windows = np.empty(n)
+    coefficients = np.empty((n, 2, 5))
+    windows = np.empty((n, 2))
     for j in range(n):
         k, _, p, a, inc, ecc, w = parameters[j, :7]
-        c = vajs_from_paiew(p, a, inc, ecc, w)
-        for v in range(9): coefficients[j, v] = c[v]
-        windows[j] = .025 + .5*t14(k, *c)
+        c = solve2d(0., p, a, inc, ecc, w)
+        coefficients[j] = c
+        left, right = bounding_box(k, c)
+        # PyTransit 2.9 uses asymmetric contact bounds, not +/- T14/2.
+        windows[j, 0] = left - .025
+        windows[j, 1] = right + .025
     return coefficients, windows
 
 
 @njit(cache=True, fastmath=False)
 def support_intervals(phase, t0, period, width):
     # Conservative candidate bounds; the original tc/window check is applied
-    # again below. NaN windows in the reference disable its shortcut entirely.
+    # again below. Nonfinite widths conservatively inspect the whole grid.
     ranges = np.zeros((2, 2), dtype=np.int64)
     if not np.isfinite(width) or width >= period/2:
         ranges[0, 1] = len(phase)
@@ -63,7 +67,7 @@ def exposure_flux(tc, p, c, exptime, nsamples):
     value = 0.
     for sample in range(1, nsamples+1):
         offset = exptime*((sample-.5)/nsamples-.5)
-        z = z_taylor_st(tc+offset, c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8])
+        z = sep_c(tc+offset, c)
         value += 1. if z > 1.+k else eval_quad_z_s(z, k, ld)
     return value/nsamples
 
@@ -80,7 +84,7 @@ def exposure_fast(tc, p, c, exptime, nsamples):
     value = 0.
     for sample in range(1, nsamples+1):
         offset = exptime*((sample-.5)/nsamples-.5)
-        z = z_taylor_st(tc+offset, c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8])
+        z = sep_c(tc+offset, c)
         value += 1. if z > 1.+k else eval_quad_z_s(z, k, ld)
     return value/nsamples
 
@@ -98,13 +102,17 @@ def projector(exposure):
             if not np.all(np.isfinite(p)) or not np.all(np.isfinite(coefficients[j])):
                 signal[j, :] = np.nan
                 continue
-            ranges = support_intervals(phase, p[1], p[2], windows[j])
+            left, right = windows[j]
+            # Symmetric bounds are only a conservative index shortcut. The
+            # exact upstream asymmetric condition is applied to every point.
+            width = max(abs(left), abs(right))
+            ranges = support_intervals(phase, p[1], p[2], width)
             for r in range(2):
                 for i in range(ranges[r, 0], ranges[r, 1]):
                     native = order[i]
                     epoch = np.floor((times[native]-p[1]+.5*p[2])/p[2])
                     tc = times[native]-(p[1]+epoch*p[2])
-                    if abs(tc) > windows[j]: continue
+                    if not (left <= tc <= right): continue
                     f = exposure(tc, p, coefficients[j], exptime, nsamples)
                     counts[j] += 1
                     if not np.isfinite(f):

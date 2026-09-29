@@ -58,6 +58,8 @@ def run_evidence(function, *args, output_path=None, seed=None, metadata=None, **
     details.update(package_version=__version__, python=platform.python_version(),
                    numpy=np.__version__, seed=seed,
                    scipy=version("scipy"), source_sha256=_source_fingerprint(),
+                   pytransit=version("pytransit"), meepmeep=version("meepmeep"),
+                   numba=version("numba"),
                    function=callable_name(function))
     with _seeded(seed), capture_sampling() as records:
         output = function(*args, **kwargs)

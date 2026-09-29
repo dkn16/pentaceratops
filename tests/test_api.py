@@ -91,3 +91,24 @@ def test_callable_instances_and_partials_are_recordable():
     result = run_evidence(partial(Callable(), 3))
     assert result.output == 4
     assert "Callable" in result.metadata["function"]
+
+
+def test_transit_dependency_versions_are_recorded(tmp_path):
+    from importlib.metadata import version
+    from pentaceratops import run_evidence, RunResult
+    path = tmp_path / "versions.npz"
+    run_evidence(lambda: 1., output_path=path)
+    result = RunResult.load(path)
+    for name in ("pytransit", "meepmeep", "numba"):
+        assert result.metadata[name] == version(name)
+
+
+def test_doctor_does_not_require_runtime_setuptools(monkeypatch, capsys):
+    from pentaceratops import cli
+    def installed(name):
+        if name == "setuptools":
+            raise cli.PackageNotFoundError(name)
+        return "test-version"
+    monkeypatch.setattr(cli, "version", installed)
+    assert cli.main(["doctor"]) == 0
+    assert '"setuptools": "not installed"' in capsys.readouterr().out

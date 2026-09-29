@@ -72,7 +72,7 @@ def simulate_TP_transit(time: np.ndarray, R_p: float, P_orb: float,
     F_comp = companion_fluxratio/(1-companion_fluxratio)
     # step 1: simulate light curve assuming only the host star exists
     _set_data_cached(tm, _tm_cache, time, exptime, nsamples)
-    flux = tm.evaluate_ps(
+    flux = tm.evaluate(
         k=R_p*Rearth/(R_s*Rsun),
         ldc=[float(u1), float(u2)],
         t0=0.0,
@@ -134,7 +134,7 @@ def simulate_EB_transit(time: np.ndarray, R_EB: float,
     k = R_EB/R_s
     if abs(k - 1.0) < 1e-6:
         k *= 0.999
-    flux = tm.evaluate_ps(
+    flux = tm.evaluate(
         k=k,
         ldc=[float(u1), float(u2)],
         t0=0.0,
@@ -146,7 +146,7 @@ def simulate_EB_transit(time: np.ndarray, R_EB: float,
         )
     # calculate secondary eclipse depth
     _set_data_cached(tm_sec, _tm_sec_cache, _SEC_DEPTH_GRID, 0.0, 1)
-    sec_flux = tm_sec.evaluate_ps(
+    sec_flux = tm_sec.evaluate(
         k=1/k,
         ldc=[float(u1), float(u2)],
         t0=0.0, p=P_orb,
@@ -215,7 +215,7 @@ def simulate_EB_transit_secondary(time: np.ndarray,time_secondary: np.ndarray, R
     k = R_EB/R_s
     if abs(k - 1.0) < 1e-6:
         k *= 0.999
-    flux = tm.evaluate_ps(
+    flux = tm.evaluate(
         k=k,
         ldc=[float(u1), float(u2)],
         t0=0.0,
@@ -228,7 +228,7 @@ def simulate_EB_transit_secondary(time: np.ndarray,time_secondary: np.ndarray, R
     # calculate secondary eclipse depth
     _set_data_cached(tm_sec, _tm_sec_cache, time_secondary, exptime, nsamples)
     t0 = (mean_anomaly_difference(ecc, argp*(pi/180.))-0.5) * P_orb
-    sec_flux = tm_sec.evaluate_ps(
+    sec_flux = tm_sec.evaluate(
         k=1/k,
         ldc=[float(u1), float(u2)],
         t0=t0, p=P_orb,
@@ -296,7 +296,7 @@ def simulate_EB_transit_evenodd(time: np.ndarray,time_secondary: np.ndarray, R_E
     k = R_EB/R_s
     if abs(k - 1.0) < 1e-6:
         k *= 0.999
-    flux = tm.evaluate_ps(
+    flux = tm.evaluate(
         k=k,
         ldc=[float(u1), float(u2)],
         t0=t0*-0.5,
@@ -309,7 +309,7 @@ def simulate_EB_transit_evenodd(time: np.ndarray,time_secondary: np.ndarray, R_E
     # calculate secondary eclipse depth
     _set_data_cached(tm_sec, _tm_sec_cache, time_secondary, exptime, nsamples)
     
-    sec_flux = tm_sec.evaluate_ps(
+    sec_flux = tm_sec.evaluate(
         k=1/k,
         ldc=[float(u1), float(u2)],
         t0=t0*0.5, p=P_orb,

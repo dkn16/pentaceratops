@@ -18,10 +18,10 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.command == "doctor":
         report = {"pentaceratops": __version__}
-        required = ("numpy", "scipy", "pandas", "astropy", "pytransit", "matplotlib",
-                    "mechanicalsoup", "beautifulsoup4", "setuptools")
+        required = ("numpy", "scipy", "pandas", "astropy", "pytransit", "meepmeep", "numba", "matplotlib",
+                    "mechanicalsoup", "beautifulsoup4")
         missing = []
-        for name in required + ("astroquery", "lightkurve"):
+        for name in required + ("setuptools", "astroquery", "lightkurve"):
             try:
                 report[name] = version(name)
             except PackageNotFoundError:

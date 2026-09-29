@@ -50,7 +50,7 @@ In a dedicated development environment:
 
 ```bash
 python -m build
-python tools/verify_distribution.py dist/pentaceratops-0.1.0.dev2-py3-none-any.whl
+python tools/verify_distribution.py dist/pentaceratops-0.1.0.dev3-py3-none-any.whl
 ```
 
 If the optional build frontend is unavailable but setuptools is installed,
@@ -58,7 +58,7 @@ an offline check can invoke the backend directly:
 
 ```bash
 python -c 'from setuptools.build_meta import build_wheel; print(build_wheel("/tmp/pentaceratops-dist"))'
-python tools/verify_distribution.py /tmp/pentaceratops-dist/pentaceratops-0.1.0.dev2-py3-none-any.whl
+python tools/verify_distribution.py /tmp/pentaceratops-dist/pentaceratops-0.1.0.dev3-py3-none-any.whl
 ```
 
 Verification unpacks a trusted locally built wheel into a temporary directory,
@@ -74,11 +74,16 @@ their extraction hashes without modifying them.
 
 ## Compatibility constraints
 
-- Current tests use Python 3.13 in `exoprob`; other advertised Python versions
-  still need a CI matrix.
-- PyTransit 2.6 uses `pkg_resources`; setuptools is constrained below 81.
+- Current tests use Python 3.13; the PyTransit upgrade is tested in a separate
+  scratch virtual environment, leaving `exoprob` unchanged. Other advertised
+  Python versions still need a CI matrix.
+- PyTransit is constrained to `>=2.9.2,<2.10`, and MeepMeep to `>=1.1,<1.2`.
+  Its quadratic kernel's orbit implementation is also used by our fast path;
+  do not relax these bounds without the compatibility tests. See
+  [PyTransit upgrade](pytransit.md). There is no runtime setuptools constraint.
 - Inherited size-one-array-to-scalar conversions emit NumPy deprecation
-  warnings. These are tracked rather than silently rewritten during extraction.
+  warnings. NumPy is temporarily bounded to `>=2.0,<2.3`; the upgrade check
+  holds NumPy at 2.2.6 instead of simultaneously changing that numerical stack.
 - The engine supports process parallelism, not concurrent threads.
 - Real-space effort defaults are provisional, not guarantees of `std(log Z)`.
   Fourier dispatcher defaults retain their historical signature and are not

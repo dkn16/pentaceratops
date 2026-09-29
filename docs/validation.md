@@ -124,3 +124,37 @@ dist/pentaceratops-0.1.0.dev2-py3-none-any.whl
 SHA-256: 10bbada2a3dbe17cbbb4a49676c994d03cea771ce3763c3c0bdb8b875e646bb4
 docs/candidate-wheel-tests.xml
 ```
+
+## PyTransit upgrade: `0.1.0.dev3` (2026-09-29)
+
+- **194 tests passed** against the standalone wheel in 28.00 seconds, using
+  PyTransit 2.9.2, MeepMeep 1.1.0 and setuptools 81.0.0 in a scratch-only
+  virtualenv overlay. NumPy remains 2.2.6 and Numba 0.61.2. The 1023 warnings
+  are inherited scalar conversions and deprecated calls in the preserved
+  reference engine; no `pkg_resources` warning occurs in the new stack.
+- The dependency bump alone failed scalar/fast EB agreement. The sparse
+  backend was then migrated to the same analytic MeepMeep expansion and
+  asymmetric contact bounds as PyTransit. Existing likelihood tolerances
+  were not relaxed. Scalar calls now use the public `evaluate` API.
+- Twenty-five added compatibility tests cover scalar API equivalence and
+  strict/fast projection agreement with the public model, including orbital
+  wrapping, duplicate times, asymmetric bounds and exposure integration.
+  Two additional API tests cover persisted dependency versions and optional
+  runtime setuptools reporting.
+- Separate old/new environments produced 240 template-array comparisons and
+  two tiny seeded TP evidence checks. Largest template differences were
+  0.00635 ppm for planets and 0.36581 ppm for EBs. Log-evidence differences in
+  those low-SNR checks were below `2e-9`. These are limited numerical checks,
+  not a population-level FPP rerun; see [upgrade notes](pytransit.md).
+- Import isolation, bundled tables, focused linting and source audit pass.
+  All 32 original files are unchanged, as is the `exoprob` dependency stack.
+  The new wheel removes the old runtime setuptools pin and requires PyTransit
+  2.9.2–2.9.x, MeepMeep 1.1.x, and NumPy 2.0–2.2.
+
+Retained artifacts (earlier wheels remain intact):
+
+```text
+dist/pentaceratops-0.1.0.dev3-py3-none-any.whl
+SHA-256: b2c6d7dbefd890465a5bbc80fb831e33be5d59e8b554f8bb73a1bac94022ef03
+docs/pytransit-wheel-tests.xml
+```

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pentaceratops"
-version = "0.1.0.dev2"
+version = "0.1.0.dev3"
 description = "Scenario-based statistical validation of transiting planet candidates"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,10 +12,9 @@ license = "MIT"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{name = "Pentaceratops developers"}]
 dependencies = [
-  "numpy>=1.24", "scipy>=1.10", "pandas>=2", "astropy>=5",
-  "pytransit>=2.6,<2.7", "matplotlib>=3.5",
+  "numpy>=2.0,<2.3", "scipy>=1.10", "pandas>=2", "astropy>=5",
+  "pytransit>=2.9.2,<2.10", "meepmeep>=1.1.0,<1.2", "matplotlib>=3.5",
   "mechanicalsoup>=1", "beautifulsoup4>=4",
-  "setuptools>=77,<81", # PyTransit 2.6 imports pkg_resources at runtime.
 ]
 
 [project.optional-dependencies]

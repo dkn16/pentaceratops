@@ -49,9 +49,15 @@ in the research repository as independent references, not runtime dependencies.
   exactly through every training observation left zero residual variance and
   prevented the first Gaussianization step. The successful `celerite` path
   and subsequent Fourier MAP objective are unchanged.
+- PyTransit 2.9.2 replaces the old orbital approximation with MeepMeep. The
+  sparse backend now shares its coefficient solver, separation function, and
+  asymmetric contact bounds. Scalar calls use the supported `evaluate` API.
+  Result records include PyTransit/MeepMeep/Numba versions. This dependency
+  change is not bitwise identical to historical runs; see [upgrade checks](pytransit.md).
 
 Reference tests compare numerical function bodies (allowing the documented
-shape fix), physical templates, a seeded sampler, and small real/Fourier TP
+shape fix and `evaluate_ps` to `evaluate` API rename), physical templates,
+a seeded sampler, and small real/Fourier TP
 evidence calculations. These are migration tests, not a claim that every
 scientific assumption or every scenario has been validated.
 

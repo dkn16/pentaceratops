@@ -147,7 +147,7 @@ def _centered_secondary_model_new(
     k = R_EB / R_s
     if abs(k - 1.0) < 1e-6:
         k *= 0.999
-    sec_flux = _secondary_nondetection_model.evaluate_ps(
+    sec_flux = _secondary_nondetection_model.evaluate(
         k=1.0 / k,
         ldc=[float(u1), float(u2)],
         t0=0.0,

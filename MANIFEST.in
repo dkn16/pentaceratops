@@ -5,3 +5,4 @@ recursive-include examples *.py *.md *.slurm
 include tools/import_research_sources.py
 include tools/verify_distribution.py
 include tools/audit_source.py
+include tools/check_pytransit_upgrade.py

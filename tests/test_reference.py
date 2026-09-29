@@ -21,6 +21,10 @@ pytestmark = pytest.mark.reference
 def test_numerical_function_bodies_unchanged(reference_root, old, new):
     import pentaceratops
     source = (reference_root / "triceratops" / (old+".py")).read_text()
+    if old == "likelihoods":
+        # PyTransit 2.9 deprecates evaluate_ps. With scalar p, evaluate
+        # dispatches to the same implementation; only this API name changes.
+        source = source.replace(".evaluate_ps(", ".evaluate(")
     if old == "persistent":
         # The only numerical-body change: fix the scalar ndim=1 covariance.
         source = source.replace(
