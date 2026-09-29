@@ -1,0 +1,231 @@
+{
+  "source_git_head": "66efcd1aac2827874658e293051928801112471e",
+  "source_git_status": " M CODEBASE.md\n M setup.py\n M triceratops/funcs.py\n M triceratops/likelihoods.py\n M triceratops/marginal_likelihoods.py\n M triceratops/marginal_likelihoods_eb.py\n M triceratops/marginal_likelihoods_new.py\n M triceratops/marginal_likelihoods_original.py\n M triceratops/persistent.py\n M triceratops/triceratops.py\n M triceratops/triceratops_new.py\n M triceratops/triceratops_original.py\n?? .claude/\n?? triceratops/archive_kdebeb_variants/\n?? triceratops/marginal_likelihoods_eb.py.bak_preopt\n?? triceratops/marginal_likelihoods_kdebeb_msline2.py\n?? triceratops/marginal_likelihoods_kdebeb_msline2_mc.py\n?? triceratops/marginal_likelihoods_kdebeb_msline2_sec_eo.py\n?? triceratops/marginal_likelihoods_mc_evenodd_secondary.py\n?? triceratops/marginal_likelihoods_new.py.bak_preopt\n?? triceratops/marginal_likelihoods_original.py.bak\n?? triceratops/scenario_sampling.py\n?? triceratops/stecomp/\n",
+  "note": "Imported working-tree files, including uncommitted corrections; old checkout untouched.",
+  "files": [
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/triceratops_new.py",
+      "destination": "src/pentaceratops/_target.py",
+      "source_sha256": "69801017c1cfdd89197c32387728d9361854f528ea4d514ae6ff896f9e708f26",
+      "imported_sha256": "1e84756f171cdf8257df3d7aabae73f1182d5f144a10a33f101593b6d625c9ec",
+      "bytes": 121444
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/funcs.py",
+      "destination": "src/pentaceratops/stellar.py",
+      "source_sha256": "122da2e1a6d31d07af548f898af3f66895eceeea780c6221ba50f372e0a94a20",
+      "imported_sha256": "122da2e1a6d31d07af548f898af3f66895eceeea780c6221ba50f372e0a94a20",
+      "bytes": 19531
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/priors.py",
+      "destination": "src/pentaceratops/priors.py",
+      "source_sha256": "aee0e4576b99532519bdb0a30250358ef14fae6004f7186662609516f9aac2fd",
+      "imported_sha256": "69c9e2d3419c414318de68474146804439779ac9d841e7ff8e59667e603ca7d1",
+      "bytes": 32692
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/likelihoods.py",
+      "destination": "src/pentaceratops/likelihoods/real.py",
+      "source_sha256": "9aa3feba9b921033f7df2e6858c1db3e8d2d2b54f07b67328800a8387b5c96a7",
+      "imported_sha256": "9aa3feba9b921033f7df2e6858c1db3e8d2d2b54f07b67328800a8387b5c96a7",
+      "bytes": 39482
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/likelihoods_fourier.py",
+      "destination": "src/pentaceratops/likelihoods/fourier.py",
+      "source_sha256": "80716828ef766f8370b710f734ae688f18eb86546f8df10acbd5d219f417f2a0",
+      "imported_sha256": "188dd515ebbcb676088b71f8f05017bf02874c6c33c22c5407d42d684b6eec0c",
+      "bytes": 10384
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/marginal_likelihoods_new.py",
+      "destination": "src/pentaceratops/evidence/real.py",
+      "source_sha256": "709a201b1588442255c79688b7b7af1c70b590648d8fe548984fd5e386775588",
+      "imported_sha256": "70d8bab8cdf6e6ef78ab7ae222e0536d7427bc8e99069c696ff63d93daaddd3f",
+      "bytes": 130888
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/marginal_likelihoods_eb.py",
+      "destination": "src/pentaceratops/evidence/eclipses.py",
+      "source_sha256": "c2473d78d992199ace6d031a1ec6b61d42f591c27c73ac981c508bd1f3ea3e3a",
+      "imported_sha256": "432f8558f051e520526a89d1a110eefad447436b649f2f40b0e027440e560b07",
+      "bytes": 131012
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/marginal_likelihoods_fourier.py",
+      "destination": "src/pentaceratops/evidence/fourier.py",
+      "source_sha256": "0abd3a35af46cd541608b33f41fb8eefde0014ee9cec34132094d29d5018a021",
+      "imported_sha256": "24db2b8cac9e12c9503dbff895e592546bf5fe7fd2b9d3ed34614ea5da88e28b",
+      "bytes": 131301
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/marginal_likelihoods_eb_fourier.py",
+      "destination": "src/pentaceratops/evidence/fourier_eclipses.py",
+      "source_sha256": "eab9817436e1e790dc8bbc076db9a192e5256a63e35623f9d1c2b62e0b5cb0b0",
+      "imported_sha256": "913fa74d0423bf8ff525eaffd2d0bbe12ee83097f536f5a51b66b2c31ae0ac1c",
+      "bytes": 101564
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/calc_probs_fourier.py",
+      "destination": "src/pentaceratops/fourier.py",
+      "source_sha256": "c179ac36e6b043f2a553608b04d9d69ef01d33ff775e5804f6a15b37ef287ed3",
+      "imported_sha256": "b8d937ccd3a34a93acc640d480b650a52f3bf32c2989c53badbdb1b24e36fe2c",
+      "bytes": 26770
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/persistent.py",
+      "destination": "src/pentaceratops/sampling/persistent.py",
+      "source_sha256": "9d59b57d8eac5035b3aa08f19483dc852fd5c3e8262c7b3705927f202f4b80e6",
+      "imported_sha256": "9d59b57d8eac5035b3aa08f19483dc852fd5c3e8262c7b3705927f202f4b80e6",
+      "bytes": 20279
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/scenario_sampling.py",
+      "destination": "src/pentaceratops/sampling/policy.py",
+      "source_sha256": "d85d8f0d304df175182935c988ffe6fc3cffbb82b5dc13a2c004f3bc4f2cef46",
+      "imported_sha256": "d85d8f0d304df175182935c988ffe6fc3cffbb82b5dc13a2c004f3bc4f2cef46",
+      "bytes": 1987
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/data/ldc_kepler.csv",
+      "destination": "src/pentaceratops/data/ldc_kepler.csv",
+      "source_sha256": "5b1d21c5677fa2926e0119bfc013df7185ac92fa44c2ed3864d41635a56507bc",
+      "imported_sha256": "5b1d21c5677fa2926e0119bfc013df7185ac92fa44c2ed3864d41635a56507bc",
+      "bytes": 92170
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/data/ldc_tess.csv",
+      "destination": "src/pentaceratops/data/ldc_tess.csv",
+      "source_sha256": "353afe9e7163da96ecf93412fea6e74b697f2c170ee10f16dac4ace35cbb9e54",
+      "imported_sha256": "353afe9e7163da96ecf93412fea6e74b697f2c170ee10f16dac4ace35cbb9e54",
+      "bytes": 63107
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/data/temp.txt",
+      "destination": "src/pentaceratops/data/temp.txt",
+      "source_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "imported_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/stecomp/__init__.py",
+      "destination": "src/pentaceratops/companions/__init__.py",
+      "source_sha256": "e9bc56a054cdee7e6d7ca34473f6303c93d598f21bec4f9c44b7118afeb84622",
+      "imported_sha256": "e9bc56a054cdee7e6d7ca34473f6303c93d598f21bec4f9c44b7118afeb84622",
+      "bytes": 165
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/stecomp/data/BHAC15_CFHT.npy",
+      "destination": "src/pentaceratops/companions/data/BHAC15_CFHT.npy",
+      "source_sha256": "6f2286681ec01c1e5f91b168a3cba8c49182cd4aca9cadb74cd62c9555f785bd",
+      "imported_sha256": "6f2286681ec01c1e5f91b168a3cba8c49182cd4aca9cadb74cd62c9555f785bd",
+      "bytes": 141253
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/stecomp/data/BHAC15_GAIA.npy",
+      "destination": "src/pentaceratops/companions/data/BHAC15_GAIA.npy",
+      "source_sha256": "cb4641884305e1f1f9be35cfa17d0c9e221e0cb51343ae0c9e2088e290b7a43b",
+      "imported_sha256": "cb4641884305e1f1f9be35cfa17d0c9e221e0cb51343ae0c9e2088e290b7a43b",
+      "bytes": 189735
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/stecomp/data/RuweTableGP.txt",
+      "destination": "src/pentaceratops/companions/data/RuweTableGP.txt",
+      "source_sha256": "7a799c900ddc36e17f20a953007ca95db59bbabd2acc5cac4741808b43940f9f",
+      "imported_sha256": "7a799c900ddc36e17f20a953007ca95db59bbabd2acc5cac4741808b43940f9f",
+      "bytes": 101616
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/stecomp/data/gaia_contrast.txt",
+      "destination": "src/pentaceratops/companions/data/gaia_contrast.txt",
+      "source_sha256": "87ae8ac32898cf09b388e7abfb76663aece14ca122be6da397db160121da297e",
+      "imported_sha256": "87ae8ac32898cf09b388e7abfb76663aece14ca122be6da397db160121da297e",
+      "bytes": 1943
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/stecomp/load.py",
+      "destination": "src/pentaceratops/companions/load.py",
+      "source_sha256": "d6cd98255ea5a16e0ed23413724768a35d5b8c4a3e5b20faca63d88401ab88e0",
+      "imported_sha256": "d6cd98255ea5a16e0ed23413724768a35d5b8c4a3e5b20faca63d88401ab88e0",
+      "bytes": 8905
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/triceratops/stecomp/sample.py",
+      "destination": "src/pentaceratops/companions/sample.py",
+      "source_sha256": "a08354733e99e787f27a17301e3991bae20f97c87f789061f92681cfb7828e06",
+      "imported_sha256": "a08354733e99e787f27a17301e3991bae20f97c87f789061f92681cfb7828e06",
+      "bytes": 7174
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/tess_test/flux_frame.py",
+      "destination": "src/pentaceratops/preprocessing/flux.py",
+      "source_sha256": "cd63cf40369830d9f9c7c5def20b3fe7db04fdfc7b21f517342cd21f37040a86",
+      "imported_sha256": "cd63cf40369830d9f9c7c5def20b3fe7db04fdfc7b21f517342cd21f37040a86",
+      "bytes": 4067
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/tess_test/fgp_detrend.py",
+      "destination": "src/pentaceratops/preprocessing/fgp.py",
+      "source_sha256": "fd5215c5fbf01e51d5c2aba6397bfb85f9e90196185f7f671604150fbac985d5",
+      "imported_sha256": "fd5215c5fbf01e51d5c2aba6397bfb85f9e90196185f7f671604150fbac985d5",
+      "bytes": 12838
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/fgp_uncertainty/fourier_posterior.py",
+      "destination": "src/pentaceratops/preprocessing/posterior.py",
+      "source_sha256": "524fbbe611343c7dd46ad3d0b990a5125fca1a7c374895b49294affcdf0938a5",
+      "imported_sha256": "524fbbe611343c7dd46ad3d0b990a5125fca1a7c374895b49294affcdf0938a5",
+      "bytes": 3756
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/fgp_uncertainty/v2_matched_windows/correlated_likelihood.py",
+      "destination": "src/pentaceratops/experimental/covariance.py",
+      "source_sha256": "399a0f51e0fd57ba36cb4f8344280f076a58e4f91626cc9fa6c9977f69407306",
+      "imported_sha256": "f2f08db983829a05b0204dfc97cb710b99c03735268efe24763af975a1224c44",
+      "bytes": 14277
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/fgp_uncertainty/v2_batched_cpu/batched_priors.py",
+      "destination": "src/pentaceratops/experimental/batched_priors.py",
+      "source_sha256": "392b1bd17d30faab0f44fc953ff160ea9f9337ff29864e9fa9671a63696d475a",
+      "imported_sha256": "392b1bd17d30faab0f44fc953ff160ea9f9337ff29864e9fa9671a63696d475a",
+      "bytes": 3666
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/fgp_uncertainty/v2_batched_cpu/physical_batch.py",
+      "destination": "src/pentaceratops/experimental/physical_batch.py",
+      "source_sha256": "743d2334540c86aec8d4908866408d56088e9441540a4c2e076c82309fa11f86",
+      "imported_sha256": "743d2334540c86aec8d4908866408d56088e9441540a4c2e076c82309fa11f86",
+      "bytes": 8558
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/fgp_uncertainty/v2_batched_cpu/sparse_kernels.py",
+      "destination": "src/pentaceratops/experimental/sparse_kernels.py",
+      "source_sha256": "d39869d967bf718fcbe45e5f90f925c34aff2ebcd4e5d39f5a9d45bd7b734d3d",
+      "imported_sha256": "d39869d967bf718fcbe45e5f90f925c34aff2ebcd4e5d39f5a9d45bd7b734d3d",
+      "bytes": 6850
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/fgp_uncertainty/v2_batched_cpu/v2_adapter.py",
+      "destination": "src/pentaceratops/experimental/v2_adapter.py",
+      "source_sha256": "5a171e2313980630f9c5f3751d7032ebb8b360380b15dfdcb0e5d81f05be0f0e",
+      "imported_sha256": "e4311b6a1aeb49b16fac0706b108dae035bf4e419dc3441920ad9ca2c43bdda5",
+      "bytes": 7703
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/fgp_uncertainty/v2_batched_cpu/sampler_mode.py",
+      "destination": "src/pentaceratops/experimental/sampler_mode.py",
+      "source_sha256": "3b761c5f1005563531928d783fffa146fd72b17d459937e9a3d86a7e502c8f67",
+      "imported_sha256": "5857c6b20a1e47dab1e4211b19fdc20bb50ea5954a8a2490905edd47b574f45f",
+      "bytes": 2474
+    },
+    {
+      "source": "/global/u1/d/dkn16/pentaceratops_research/triceratops/LICENSE",
+      "destination": "LICENSE",
+      "source_sha256": "5e2205788f6caa5cf5620ae2687f025ab0a4d25e0a004293dbdc9d305c9d3331",
+      "imported_sha256": "5e2205788f6caa5cf5620ae2687f025ab0a4d25e0a004293dbdc9d305c9d3331",
+      "bytes": 1082
+    }
+  ]
+}

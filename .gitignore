@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+.venv/
+# Match the local research symlink as well as a directory.
+/research
+local_workspace.json
+.env
+.env.*
+*.log
+# Results, populations and light curves belong in configurable scratch storage.
+results/
+cache/
+/plots/
+/src/pentaceratops/data/temp.txt
+*.npz
+*.fits

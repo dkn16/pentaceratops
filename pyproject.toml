@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pentaceratops"
+version = "0.1.0.dev2"
+description = "Scenario-based statistical validation of transiting planet candidates"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{name = "Pentaceratops developers"}]
+dependencies = [
+  "numpy>=1.24", "scipy>=1.10", "pandas>=2", "astropy>=5",
+  "pytransit>=2.6,<2.7", "matplotlib>=3.5",
+  "mechanicalsoup>=1", "beautifulsoup4>=4",
+  "setuptools>=77,<81", # PyTransit 2.6 imports pkg_resources at runtime.
+]
+
+[project.optional-dependencies]
+catalogs = ["astroquery>=0.4.6", "lightkurve>=2"]
+dev = ["pytest>=8", "build>=1", "ruff>=0.9"]
+
+[project.scripts]
+pentaceratops = "pentaceratops.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = false
+
+[tool.setuptools.package-data]
+pentaceratops = ["data/*.csv"]
+"pentaceratops.companions" = ["data/*.npy", "data/*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["reference: compare with the preserved source checkout (opt-in)"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["F821", "F822", "F823"]

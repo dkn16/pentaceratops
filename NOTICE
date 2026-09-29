@@ -1,0 +1,14 @@
+Pentaceratops derives its target, transit-model, prior, stellar-relation and
+scenario machinery from TRICERATOPS by Steven Giacalone and subsequent local
+Pentaceratops research developments. The upstream MIT notice is preserved in
+LICENSE. Persistent sampling implements work by Minas Karamanis and Uros Seljak;
+FGP methods derive from the related research workflow by Jakob Robnik and
+collaborators. Scientific citations are listed in the associated manuscript.
+
+The companions subpackage contains the locally vendored stecomp implementation
+and its input tables. Those tables and their original scientific sources must
+receive an attribution/licensing review before a public distribution release.
+This development package is not an assertion that such a release review is complete.
+
+docs/source_manifest.json records the local files imported during extraction.
+No original TRICERATOPS snapshot, archived experiment or prior result is replaced.
