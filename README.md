@@ -4,7 +4,9 @@ Statistical validation of transiting planet candidates using competing planet
 and eclipsing-binary scenarios, real-space or Fourier-space likelihoods, and
 persistent sampling.
 
-**Development version: `0.1.0.dev8`.** Prepared-input interfaces now support
+**Development version: `0.1.0.dev9`.** Run evidence from prepared files with
+`pentaceratops evidence target.json`; see the [one-command workflow](docs/evidence_command.md)
+and [configuration template](examples/evidence.json). Prepared-input interfaces support
 folded real-space and full-orbit folded Fourier HZ runs, with consistent aperture
 flux frames, common null references, and recorded weighted posterior pools.
 Use `calc_probs_folded_real` or `calc_probs_folded_fourier` for these workflows;

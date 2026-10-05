@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-05",
+  "version": "0.1.0.dev9",
+  "source_sha256": "6898dddd80b4e032cefd3f0049bb596786b55c9c7ad88d33053fdfd5223a1ed2",
+  "standalone_wheel": {
+    "file": "dist/pentaceratops-0.1.0.dev9-py3-none-any.whl",
+    "sha256": "324776d182e4244519d5dc68e0a533dd97ee8f330893d76e96d423b77db82306",
+    "tests": 648,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 94.618,
+    "warnings": 63259
+  },
+  "new_tests": {
+    "count": 16,
+    "coverage": [
+      "dense-reference conditional covariance and cross-panel propagation",
+      "full-orbit saved PSD covariance and gaps",
+      "actual Real/Fourier CLI sampling identical to Python API",
+      "input hashes, saved pools, relative paths and overrides",
+      "invalid inputs rejected before inference",
+      "existing HZ Real/Fourier input loading"
+    ]
+  },
+  "scope": "Offline synthetic/reference regression; no catalog queries, production sampling, PSD refits, or paper-result changes."
+}

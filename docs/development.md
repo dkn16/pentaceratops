@@ -59,7 +59,7 @@ In a dedicated development environment:
 
 ```bash
 python -m build
-python tools/verify_distribution.py dist/pentaceratops-0.1.0.dev8-py3-none-any.whl
+python tools/verify_distribution.py dist/pentaceratops-0.1.0.dev9-py3-none-any.whl
 ```
 
 If the optional build frontend is unavailable but setuptools is installed,
@@ -67,7 +67,7 @@ an offline check can invoke the backend directly:
 
 ```bash
 python -c 'from setuptools.build_meta import build_wheel; print(build_wheel("/tmp/pentaceratops-dist"))'
-python tools/verify_distribution.py /tmp/pentaceratops-dist/pentaceratops-0.1.0.dev8-py3-none-any.whl
+python tools/verify_distribution.py /tmp/pentaceratops-dist/pentaceratops-0.1.0.dev9-py3-none-any.whl
 ```
 
 Verification unpacks a trusted locally built wheel into a temporary directory,

@@ -3,14 +3,17 @@
 Importing the package performs no catalogue queries or downloads.
 """
 
-__version__ = "0.1.0.dev8"
+__version__ = "0.1.0.dev9"
 __all__ = ["Target", "calc_probs_fourier", "run_evidence", "RunResult",
            "scenario_probabilities", "calc_probs_folded_real", "calc_probs_folded_fourier",
            "load_folded_real", "prepare_folded_fourier", "FoldedFourierData",
-           "run_folded_baseline", "__version__"]
+           "run_folded_baseline", "run_prepared", "__version__"]
 
 
 def __getattr__(name):
+    if name == "run_prepared":
+        from .prepared import run_prepared
+        return run_prepared
     if name == "run_folded_baseline":
         from .evidence.folded_baseline import run_folded_baseline
         return run_folded_baseline

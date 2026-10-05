@@ -35,7 +35,7 @@ from pathlib import Path
 import sys
 import pentaceratops
 assert Path(pentaceratops.__file__).is_relative_to(Path.cwd())
-from pentaceratops import Target, RunResult, run_evidence, scenario_probabilities
+from pentaceratops import Target, RunResult, run_evidence, run_prepared, scenario_probabilities
 from pentaceratops import (load_folded_real, prepare_folded_fourier, FoldedFourierData,
                           calc_probs_folded_real, calc_probs_folded_fourier, run_folded_baseline)
 from pentaceratops.evidence import real, eclipses, fourier, fourier_eclipses

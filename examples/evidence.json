@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "mission": "TESS",
+  "target_id": 123,
+  "stars": "stars.csv",
+  "trilegal": "trilegal.csv",
+  "input": {
+    "format": "candidate",
+    "path": "prepared/candidate.npz"
+  },
+  "likelihood": "real",
+  "settings": {
+    "N": 500,
+    "steps": 50,
+    "seed": 42,
+    "eb_eta": 0.1
+  },
+  "output": "results/real.npz"
+}

@@ -4,6 +4,11 @@ These examples start from a TIC/TOI or KIC/KOI identifier. Edit `TARGET` near
 the top of `tess_candidate.py` or `kepler_candidate.py`, or use `--target`.
 They download and preprocess photometry; **they do not calculate an FPP**.
 
+Once those files and the stellar field/population inputs are available, the
+separate evidence command is `pentaceratops evidence target.json`. Copy and
+edit [evidence.json](evidence.json); see the [evidence command](../docs/evidence_command.md)
+for Real/Fourier selection and the required stellar CSV columns.
+
 ## Quick start
 
 Run from the package checkout after installing the catalogue dependencies in
@@ -178,8 +183,9 @@ accepts the same main choices (`source="nasa"` by default), returning a
 `RunResult` and its path. `preprocess_blocks` is the filesystem/network-free
 array entry point. `--help` lists all CLI controls without querying catalogues.
 
-Stellar-field/companion-population setup, frame-corrected all-scenario evidence,
-FGP covariance propagation into windows, and full-period Fourier preprocessing
-remain separate integration work. Saved bundles explicitly mark
-`likelihood_ready=False`; do not pass them to a dispatcher and assume the
-remaining scientific bookkeeping has been completed.
+Saved bundles explicitly mark `likelihood_ready=False`: they contain MAP
+preparation rather than a likelihood covariance. `pentaceratops evidence`
+finishes covariance propagation from the saved fit state and calls the optimized
+evidence API, without repeating detrending or PSD estimation. Stellar-field and
+companion-population inputs must still be supplied explicitly. Direct low-level
+dispatchers do not perform this conversion automatically.

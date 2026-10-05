@@ -3,13 +3,16 @@
 This is the implementation contract for the next integration milestone, not
 documentation of functions already available. The current package exposes
 `run_evidence`, the [prepared-input folded HZ interfaces](hz_runs.md),
+the offline `run_prepared` / [evidence command](evidence_command.md),
 the recorded compatibility interfaces, and lower-level building blocks. Do not add placeholder `preprocess`, `validate`, or `report` functions
 that appear to run the corrected pipeline before that integration is complete.
 
 The [download/preparation examples](../examples/README.md) now implement an
 initial, explicitly limited preparation stage. They default to NASA TOI/KOI
 ephemerides and allow the Bayesian catalogue for TESS. They do not yet provide
-the complete corrected validation or reporting interfaces described below.
+the complete three-stage interface described below. Their saved bundles can
+now feed the evidence command with explicit stellar-field/population files;
+the command propagates their saved PSD uncertainty without refitting it.
 
 ## Simple by default, configurable when needed
 

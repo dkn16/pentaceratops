@@ -1,4 +1,4 @@
-"""Small offline CLI; intentionally not a production TIC runner yet."""
+"""Offline evidence, saved-result inspection and dependency reporting."""
 
 import argparse
 from importlib.metadata import PackageNotFoundError, version
@@ -15,7 +15,31 @@ def main(argv=None):
     commands.add_parser("sampling-policy", help="Show provisional real-space sampling defaults")
     summary = commands.add_parser("inspect", help="Summarize a saved result bundle")
     summary.add_argument("path")
+    evidence = commands.add_parser("evidence", help="Run evidence from prepared files and a JSON configuration")
+    evidence.add_argument("config", help="JSON configuration; relative input paths use its directory")
+    evidence.add_argument("--likelihood", choices=("real", "fourier"))
+    evidence.add_argument("--output", help="New result NPZ path, relative to the current directory")
+    for name in ("N", "steps", "nsamples", "seed", "posterior-samples"):
+        evidence.add_argument("--"+name, type=int, default=None)
+    evidence.add_argument("--eb-eta", type=float)
     args = parser.parse_args(argv)
+    if args.command == "evidence":
+        from .preprocessing.example_cli import configure_runtime, default_cache_dir
+        configure_runtime(default_cache_dir())
+        from .prepared import run_prepared
+        overrides = {key: getattr(args, key) for key in
+                     ("N", "steps", "nsamples", "seed", "posterior_samples", "eb_eta")
+                     if getattr(args, key) is not None}
+        try:
+            result = run_prepared(args.config, likelihood=args.likelihood,
+                                  output_path=args.output, **overrides)
+        except (ValueError, FileNotFoundError, FileExistsError) as error:
+            parser.error(str(error))
+        table = result.output
+        print(json.dumps(dict(output=result.metadata["prepared_run"]["output_path"],
+            likelihood=result.metadata["prepared_run"]["likelihood"], scenarios=len(table),
+            **{key: table.attrs[key] for key in ("FPP", "FPP_EB", "NFPP", "scenario_scope")}), indent=2))
+        return 0
     if args.command == "doctor":
         report = {"pentaceratops": __version__}
         required = ("numpy", "scipy", "pandas", "astropy", "pytransit", "meepmeep", "numba", "matplotlib",

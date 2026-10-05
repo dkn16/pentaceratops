@@ -378,3 +378,36 @@ dist/pentaceratops-0.1.0.dev8-py3-none-any.whl
 SHA-256: df9ec7bfdee4fcd36677becef222382d7fc4476ddec7cc605bef5b40d85eda9c
 dist/hz-dev8-wheel-tests.xml
 ```
+
+## Prepared-file evidence command: `0.1.0.dev9` (2026-10-05)
+
+`pentaceratops evidence target.json` and `run_prepared` connect local prepared
+files to the existing optimized HZ evidence routines. Candidate-example bundles
+reuse their saved PSD and final fit state to construct the Real conditional
+covariance or full-orbit Fourier covariance. Stellar-field/population files
+remain explicit inputs. Existing HZ likelihood-ready files load directly.
+
+- **648 tests passed**, none skipped, against the standalone wheel in 94.69
+  seconds, including 16 new command and covariance tests.
+- Independent dense references verify conditional means, cross-panel trend
+  covariance, measurement-noise handling and full-orbit PSD propagation with gaps.
+- Actual tiny Real and Fourier evidence calls through the CLI produce exactly
+  the same scenario evidences as the corresponding Python calls with equal
+  settings and seeds. Sampling pools, input hashes and configuration overrides
+  survive result serialization.
+- Tests check relative paths, no-overwrite behavior, target identity, incompatible
+  input formats, invalid settings, and loading existing HZ products.
+- The wheel contains the same 65 Python source files as the validated source.
+  No inference kernels or physical-prior defaults changed. No production data,
+  stored FPP values or manuscript tables were modified.
+
+The [validation record](evidence-command-validation-20261005.json) records the
+source and wheel hashes. These are software/integration checks; they do not
+establish evidence convergence or validate a new candidate scientifically.
+The 63,259 warnings are inherited scalar-conversion/deprecated-API warnings.
+
+```text
+dist/pentaceratops-0.1.0.dev9-py3-none-any.whl
+SHA-256: 324776d182e4244519d5dc68e0a533dd97ee8f330893d76e96d423b77db82306
+dist/evidence-dev9-wheel-tests.xml
+```

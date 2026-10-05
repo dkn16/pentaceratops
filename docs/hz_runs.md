@@ -1,5 +1,10 @@
 # Folded HZ runs
 
+For a command-line entry point using these same routines, run
+`pentaceratops evidence target.json`. The [evidence command](evidence_command.md)
+accepts the prepared files below or saved example-script bundles plus explicit
+stellar-field/population inputs.
+
 The prepared-input HZ interfaces were introduced in `0.1.0.dev7`; `0.1.0.dev8`
 adds automatic observation-based timing as the default. They integrate
 the optimized production likelihood adapters with recorded evidence and saved
