@@ -2,11 +2,15 @@
 import hashlib
 import io
 from pathlib import Path
+import ssl
+from types import SimpleNamespace
+from urllib.error import URLError
 
 import numpy as np
 import pandas as pd
 import pytest
 from astropy.io import fits
+from requests.exceptions import SSLError
 
 from pentaceratops import prepare_target, load_target
 from pentaceratops.evidence import evidence
@@ -92,7 +96,7 @@ def test_query_download_and_population_reader_round_trip(monkeypatch, tmp_path, 
         np.testing.assert_allclose([ra, dec], [host.ra, host.dec])
         assert kwargs["mag_lim"] == "21.0"
         return "https://fixture.invalid/population"
-    monkeypatch.setattr("pentaceratops.stellar.query_TRILEGAL", query)
+    monkeypatch.setattr("pentaceratops.preprocessing.field._query_population", query)
     responses = [b"still running", RAW_POPULATION]
     monkeypatch.setattr(field, "urlopen", lambda *a, **k: io.BytesIO(responses.pop(0)))
     monkeypatch.setattr(field.time, "sleep", lambda s: None)
@@ -105,6 +109,107 @@ def test_query_download_and_population_reader_round_trip(monkeypatch, tmp_path, 
     np.testing.assert_array_equal(magnitudes, [14., 16.])
     np.testing.assert_array_equal(masses, [1., .8])
     assert target.field_metadata["population"]["source"] == "TRILEGAL"
+
+
+@pytest.mark.parametrize("verify", [True, False])
+@pytest.mark.parametrize("fallback", [False, True])
+def test_form_query_uses_local_verification_for_both_service_versions(monkeypatch, verify, fallback):
+    original_context = ssl._create_default_https_context
+    visits, forms, submitted = [], [], []
+    session = SimpleNamespace(verify=None, close=lambda: visits.append("closed"))
+    class Browser:
+        def __init__(self):
+            self.session = session
+        def open(self, url, **kwargs):
+            assert kwargs["timeout"] == 60. and self.session.verify is verify
+            self.url = url
+            visits.append(url)
+        def select_form(self, nr):
+            assert nr == 0
+            forms.append({})
+        def __setitem__(self, key, value):
+            forms[-1][key] = value
+        def submit_selected(self, **kwargs):
+            assert kwargs["timeout"] == 60. and self.session.verify is verify
+            submitted.append(self.url)
+        def get_current_page(self):
+            links = [] if fallback and len(forms) == 1 else [{"href": "../tmp/result.dat"}]
+            return SimpleNamespace(select=lambda _: links)
+        def get_url(self):
+            return self.url
+    monkeypatch.setattr("mechanicalsoup.StatefulBrowser", Browser)
+    monkeypatch.setattr(field.time, "sleep", lambda _: None)
+    url = field._query_population(42., -12., mag_lim="21", verify_ssl=verify)
+    assert url == "https://stev.oapd.inaf.it/tmp/result.dat"
+    assert forms[0] == dict(gal_coord="2", eq_alpha="42.0", eq_delta="-12.0", field="0.1",
+        photsys_file="tab_mag_odfnew/tab_mag_TESS_2mass.dat", icm_lim="1", mag_lim="21", binary_kind="0")
+    assert len(submitted) == (2 if fallback else 1)
+    if fallback:
+        assert forms[1]["photsys_file"] == "tab_mag_odfnew/tab_mag_2mass.dat"
+    assert visits[-1] == "closed"
+    assert ssl._create_default_https_context is original_context
+
+
+def test_failed_form_closes_session_without_global_ssl_change(monkeypatch):
+    original_context = ssl._create_default_https_context
+    closed = []
+    session = SimpleNamespace(verify=None, close=lambda: closed.append(True))
+    def fail(*a, **k):
+        raise SSLError("CERTIFICATE_VERIFY_FAILED")
+    monkeypatch.setattr("mechanicalsoup.StatefulBrowser",
+                        lambda: SimpleNamespace(session=session, open=fail))
+    with pytest.raises(SSLError):
+        field._query_population(42., -12., mag_lim="21", verify_ssl=False)
+    assert closed == [True] and ssl._create_default_https_context is original_context
+
+
+@pytest.mark.parametrize("failure", ["query", "download", "wrapped_download"])
+def test_certificate_failure_is_immediate_and_actionable(monkeypatch, tmp_path, inputs, failure):
+    saved, stars, _ = inputs
+    called = []
+    def query(*a, **kwargs):
+        assert kwargs["verify_ssl"] is True
+        called.append("query")
+        if failure == "query":
+            raise SSLError("CERTIFICATE_VERIFY_FAILED")
+        return "https://fixture.invalid/population"
+    def download(*a, **kwargs):
+        called.append("download")
+        error = ssl.SSLCertVerificationError("unable to get local issuer certificate")
+        raise URLError(error) if failure == "wrapped_download" else error
+    monkeypatch.setattr(field, "_query_population", query)
+    monkeypatch.setattr(field, "urlopen", download)
+    monkeypatch.setattr(field.time, "sleep", lambda _: pytest.fail("Do not poll or retry TLS errors"))
+    with pytest.raises(RuntimeError, match="trilegal_fname=.*trilegal_verify_ssl=False"):
+        prepare_target(saved, tmp_path/"field", stars=stars)
+    assert called == (["query"] if failure == "query" else ["query", "download"])
+    assert not (tmp_path/"field").exists()
+
+
+@pytest.mark.parametrize("verify", [True, False])
+def test_tls_setting_reaches_query_download_and_provenance(monkeypatch, tmp_path, inputs, verify):
+    saved, stars, _ = inputs
+    original_context = ssl._create_default_https_context
+    def query(*a, **kwargs):
+        assert kwargs["verify_ssl"] is verify
+        return "https://fixture.invalid/population"
+    def download(*a, **kwargs):
+        context = kwargs["context"]
+        assert context.check_hostname is verify
+        assert context.verify_mode == (ssl.CERT_REQUIRED if verify else ssl.CERT_NONE)
+        return io.BytesIO(RAW_POPULATION)
+    monkeypatch.setattr(field, "_query_population", query)
+    monkeypatch.setattr(field, "urlopen", download)
+    target = prepare_target(saved, tmp_path/"field", stars=stars, trilegal_verify_ssl=verify)
+    assert target.field_metadata["population"]["verify_ssl"] is verify
+    assert ssl._create_default_https_context is original_context
+
+
+def test_tls_option_requires_boolean_before_queries(monkeypatch, tmp_path, inputs):
+    saved, _, _ = inputs
+    no_network(monkeypatch)
+    with pytest.raises(ValueError, match="must be a boolean"):
+        prepare_target(saved, tmp_path/"field", trilegal_verify_ssl="False")
 
 
 def test_adopted_single_footer_population_is_copied_without_changing_reader_selection(monkeypatch, tmp_path, inputs):
@@ -188,7 +293,7 @@ def test_broken_output_symlink_is_not_followed(monkeypatch, tmp_path, inputs):
 @pytest.mark.parametrize("failure", ["unavailable", "timeout", "missing_TESS"])
 def test_population_service_failure_never_publishes_partial_field(monkeypatch, tmp_path, inputs, failure):
     saved, stars, _ = inputs
-    monkeypatch.setattr("pentaceratops.stellar.query_TRILEGAL",
+    monkeypatch.setattr("pentaceratops.preprocessing.field._query_population",
         lambda *a, **k: None if failure == "unavailable" else "https://fixture.invalid/population")
     payload = RAW_POPULATION.replace(b"TESS", b"Vmag") if failure == "missing_TESS" else b"running"
     monkeypatch.setattr(field, "urlopen", lambda *a, **k: io.BytesIO(payload))

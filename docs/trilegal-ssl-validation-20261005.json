@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-05",
+  "version": "0.1.0.dev13",
+  "source_sha256": "7232db26a0c0a6646a9df803be7b14e76d2868369e4a5ee9cd799668d4114a88",
+  "standalone_wheel": {
+    "file": "dist/pentaceratops-0.1.0.dev13-py3-none-any.whl",
+    "sha256": "596f780d3d68aafdcda8f86fe1407f1ff9457568cc1d8155ee21f7d0dae5c400",
+    "tests": 700,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 99.876
+  },
+  "new_tests": {
+    "count": 11,
+    "coverage": [
+      "request-local TLS settings on both service versions and result download",
+      "no mutation of process-wide SSL context, including failed form requests",
+      "certificate failures stop immediately with actionable errors and no partial field",
+      "TLS setting recorded in population provenance; non-boolean inputs rejected"
+    ]
+  },
+  "live_tls_diagnosis": {
+    "server": "stev.oapd.inaf.it",
+    "presented_certificates": 1,
+    "error": "unable to get local issuer certificate",
+    "missing_intermediate": "ZeroSSL RSA DV SSL CA 2",
+    "verification": "Leaf and hostname verify against default system trust store when intermediate supplied; verified HTTPS form GET also succeeds. No simulation submitted."
+  },
+  "real_preparation": {
+    "candidate": "TOI-700.02",
+    "directory": "/pscratch/sd/d/dkn16/exoplanet/target_test",
+    "catalog_sources": 253,
+    "eligible_sources": 7,
+    "prepared_and_reloaded": true,
+    "population_sha256": "edf30cbc4d29064f4e1df1224e9490f49b4c87dba6e35c23969534db32965dbc",
+    "population": "Existing adopted file copied unchanged with dev12 before this TLS-only patch"
+  },
+  "scope": "Network paths tested with mocks; live verified form GET used for diagnosis only. No new TRILEGAL simulation or production evidence calculation; saved FPP and paper results unchanged."
+}

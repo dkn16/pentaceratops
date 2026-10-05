@@ -5,13 +5,16 @@ import json
 from numbers import Integral
 from pathlib import Path
 import shutil
+import ssl
 import tempfile
 import time
 from urllib.error import URLError
+from urllib.parse import urljoin
 from urllib.request import urlopen
 
 import numpy as np
 import pandas as pd
+from requests.exceptions import SSLError as RequestsSSLError
 
 from ..results import RunResult
 from .aperture import geometry_from_fits, dilution_depths
@@ -90,24 +93,63 @@ def _validate_population(path):
         raise ValueError("TRILEGAL CSV must retain its completion record")
 
 
-def _download_population(ra, dec, destination, *, mag_lim, timeout, poll_interval):
-    from ..stellar import query_TRILEGAL
-    url = query_TRILEGAL(ra, dec, mag_lim=str(mag_lim))
+def _query_population(ra, dec, *, mag_lim, verify_ssl):
+    """Submit the inherited TRILEGAL recipe with request-local TLS settings."""
+    from mechanicalsoup import StatefulBrowser
+    browser = StatefulBrowser()
+    browser.session.verify = verify_ssl
+    try:
+        for version, photometry in (("1.6", "TESS_2mass"), ("1.5", "2mass")):
+            browser.open(f"https://stev.oapd.inaf.it/cgi-bin/trilegal_{version}", timeout=60.)
+            browser.select_form(nr=0)
+            fields = dict(gal_coord="2", eq_alpha=str(ra), eq_delta=str(dec), field="0.1",
+                photsys_file=f"tab_mag_odfnew/tab_mag_{photometry}.dat", icm_lim="1",
+                mag_lim=str(mag_lim), binary_kind="0")
+            for key, value in fields.items():
+                browser[key] = value
+            browser.submit_selected(timeout=60.)
+            time.sleep(5.)
+            links = browser.get_current_page().select("a[href]")
+            if links:
+                url = urljoin(browser.get_url(), links[0]["href"])
+                return url.replace("http://stev.oapd.inaf.it/", "https://stev.oapd.inaf.it/", 1)
+        return None
+    finally:
+        browser.session.close()
+
+
+def _tls_error():
+    return RuntimeError(
+        "TRILEGAL HTTPS connection failed. Supply an existing population with "
+        "trilegal_fname=... to avoid INAF, or explicitly set trilegal_verify_ssl=False "
+        "to disable certificate verification for this TRILEGAL request only."
+    )
+
+
+def _download_population(ra, dec, destination, *, mag_lim, timeout, poll_interval, verify_ssl=True):
+    try:
+        url = _query_population(ra, dec, mag_lim=str(mag_lim), verify_ssl=verify_ssl)
+    except RequestsSSLError as exc:
+        raise _tls_error() from exc
     if url is None:
         raise RuntimeError("TRILEGAL is unavailable; retry or supply trilegal_fname")
+    context = ssl.create_default_context() if verify_ssl else ssl._create_unverified_context()
     deadline = time.monotonic() + timeout
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise TimeoutError("TRILEGAL population did not finish; retry or supply trilegal_fname")
         try:
-            with urlopen(url, timeout=min(60., remaining)) as response:
+            with urlopen(url, timeout=min(60., remaining), context=context) as response:
                 raw = response.read()
             text = raw.decode("utf-8")
             if text.rstrip().endswith("#TRILEGAL normally terminated"):
                 break
-        except (URLError, TimeoutError):
-            pass
+        except ssl.SSLCertVerificationError as exc:
+            raise _tls_error() from exc
+        except (URLError, TimeoutError) as exc:
+            if isinstance(getattr(exc, "reason", None), ssl.SSLCertVerificationError):
+                raise _tls_error() from exc
         time.sleep(min(poll_interval, max(0., deadline - time.monotonic())))
     table = pd.read_csv(io.StringIO(text), sep=r"\s+")
     # Strip only trailing non-stellar service records, not missing-value stars.
@@ -122,12 +164,12 @@ def _download_population(ra, dec, destination, *, mag_lim, timeout, poll_interva
     pd.concat([table, footer], ignore_index=True).to_csv(destination, index=False)
     _validate_population(destination)
     return dict(source="TRILEGAL", url=url, raw_sha256=hashlib.sha256(raw).hexdigest(),
-                ra=ra, dec=dec, mag_lim=mag_lim)
+                ra=ra, dec=dec, mag_lim=mag_lim, verify_ssl=verify_ssl)
 
 
 def prepare_target(prepared, output_dir, *, stars=None, trilegal_fname=None,
                    transit_depth=None, search_radius=10, mag_lim=21.,
-                   population_timeout=900., poll_interval=10.):
+                   population_timeout=900., poll_interval=10., trilegal_verify_ssl=True):
     """Create stars.csv and trilegal.csv and return an evidence-ready target.
 
     Accept a TESS candidate RunResult or saved NPZ from prepare_candidate.
@@ -142,11 +184,15 @@ def prepare_target(prepared, output_dir, *, stars=None, trilegal_fname=None,
     Use load_target(output_dir) for subsequent offline calls. This function
     does not change photometry, run evidence, or overwrite any existing field.
     population_timeout bounds result polling after the TRILEGAL form query.
+    trilegal_verify_ssl=False explicitly disables certificate verification for
+    this TRILEGAL query/download only; global SSL and TIC settings are unchanged.
     """
     destination = Path(output_dir).expanduser()
     if destination.exists() or destination.is_symlink():
         raise FileExistsError(f"Field already exists: {destination}; use load_target or a new directory")
     destination = destination.resolve()
+    if not isinstance(trilegal_verify_ssl, bool):
+        raise ValueError("trilegal_verify_ssl must be a boolean")
     if isinstance(prepared, (str, Path)):
         prepared = RunResult.load(Path(prepared).expanduser())
     if not isinstance(prepared, RunResult) or prepared.metadata.get("artifact") != "candidate_preparation":
@@ -197,7 +243,7 @@ def prepare_target(prepared, output_dir, *, stars=None, trilegal_fname=None,
         if population is None:
             population_info = _download_population(float(field.iloc[0].ra), float(field.iloc[0].dec),
                 staging/"trilegal.csv", mag_lim=float(mag_lim), timeout=float(population_timeout),
-                poll_interval=float(poll_interval))
+                poll_interval=float(poll_interval), verify_ssl=trilegal_verify_ssl)
         else:
             shutil.copyfile(population, staging/"trilegal.csv")
             population_info = dict(source="supplied file", path=str(population), sha256=_sha256(population))

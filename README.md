@@ -4,7 +4,7 @@ Statistical validation of transiting planet candidates using competing planet
 and eclipsing-binary scenarios, real-space or Fourier-space likelihoods, and
 persistent sampling.
 
-**Development version: `0.1.0.dev12`.** Run evidence directly from Python:
+**Development version: `0.1.0.dev13`.** Run evidence directly from Python:
 
 ```python
 from pentaceratops import prepare_target

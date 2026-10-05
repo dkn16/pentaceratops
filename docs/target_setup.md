@@ -93,6 +93,7 @@ Other keyword arguments are:
 | `mag_lim=21` | Limiting magnitude sent to a new TRILEGAL query. |
 | `population_timeout=900` | Maximum seconds polling the result after the TRILEGAL form query. |
 | `poll_interval=10` | Seconds between result checks. |
+| `trilegal_verify_ssl=True` | Verify HTTPS certificates for TRILEGAL query and download. Set `False` explicitly only to work around a certificate failure; this does not change TIC or global SSL settings. |
 
 Supplied stellar inputs use solar mass/radius, kelvin, milliarcsecond parallax
 and RA/Dec degrees. All sources need coordinates and TESS magnitudes for
@@ -107,6 +108,27 @@ Record the sources of corrections and follow-up exclusions alongside it.
 
 An optional prepared companion population remains an evidence argument,
 `molusc_file=...`; it is separate from the TRILEGAL background population.
+
+## INAF certificate failures
+
+For `CERTIFICATE_VERIFY_FAILED`, an existing population supplied through
+`trilegal_fname` avoids INAF entirely. For a new population, an explicit
+request-local workaround is available:
+
+```python
+from pentaceratops import prepare_target
+
+target = prepare_target(
+    prepared, output_dir="/path/to/new_field",
+    trilegal_verify_ssl=False,
+)
+```
+
+This disables server-certificate authentication for both the TRILEGAL form
+request and result download. It is opt-in, is recorded in the field provenance,
+and does not change process-wide SSL settings or TIC catalog requests. The
+default remains `True`; certificate failures fail immediately with a useful
+message instead of waiting for the population timeout.
 
 ## Existing HZ fields
 
