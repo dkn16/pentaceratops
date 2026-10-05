@@ -1,6 +1,19 @@
-# Planned three-stage user interface
+# Python evidence and the planned three-stage interface
 
-This is the implementation contract for the next integration milestone, not
+The evidence step is available now:
+
+```python
+from pentaceratops.evidence import evidence
+results = evidence(prepared, target=target, likelihood="fourier", N=500, steps=50, eb_eta=0.1)
+```
+
+This direct function accepts preprocessing objects or saved preparations and
+returns a `RunResult`, without requiring a configuration file or exporting the
+stellar table. Saving is optional. See the [Python evidence interface](evidence_api.md).
+
+## Planned complete workflow
+
+The remainder is the implementation contract for the next integration milestone, not
 documentation of functions already available. The current package exposes
 `run_evidence`, the [prepared-input folded HZ interfaces](hz_runs.md),
 the offline `run_prepared` / [evidence command](evidence_command.md),

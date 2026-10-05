@@ -1,5 +1,11 @@
 # Run evidence from prepared files
 
+For a direct Python call without JSON, use
+`from pentaceratops.evidence import evidence`, followed by
+`results = evidence(prepared, target=target, likelihood="fourier")`.
+See the [Python interface](evidence_api.md). The configuration-based CLI below
+is optional.
+
 After preprocessing and supplying the stellar field/population inputs, run:
 
 ```bash

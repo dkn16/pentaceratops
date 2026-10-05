@@ -4,9 +4,16 @@ Statistical validation of transiting planet candidates using competing planet
 and eclipsing-binary scenarios, real-space or Fourier-space likelihoods, and
 persistent sampling.
 
-**Development version: `0.1.0.dev9`.** Run evidence from prepared files with
-`pentaceratops evidence target.json`; see the [one-command workflow](docs/evidence_command.md)
-and [configuration template](examples/evidence.json). Prepared-input interfaces support
+**Development version: `0.1.0.dev10`.** Run evidence directly from Python:
+
+```python
+from pentaceratops.evidence import evidence
+results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+```
+
+See the [Python interface](docs/evidence_api.md) for input objects and results.
+The optional [command-line workflow](docs/evidence_command.md) also remains
+available. Prepared-input interfaces support
 folded real-space and full-orbit folded Fourier HZ runs, with consistent aperture
 flux frames, common null references, and recorded weighted posterior pools.
 Use `calc_probs_folded_real` or `calc_probs_folded_fourier` for these workflows;

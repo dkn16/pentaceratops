@@ -411,3 +411,33 @@ dist/pentaceratops-0.1.0.dev9-py3-none-any.whl
 SHA-256: 324776d182e4244519d5dc68e0a533dd97ee8f330893d76e96d423b77db82306
 dist/evidence-dev9-wheel-tests.xml
 ```
+
+## Direct Python evidence: `0.1.0.dev10` (2026-10-05)
+
+`from pentaceratops.evidence import evidence` exposes the direct
+`results = evidence(prepared, target=target, likelihood=...)` interface.
+It accepts in-memory preparations or saved inputs and returns a `RunResult`;
+configuration files, CSV exports and result-file creation are optional.
+The existing CLI delegates inference to this same function. Numerical kernels
+and physical-prior defaults are unchanged.
+
+- **665 tests passed**, none skipped, against the standalone wheel in 98.76
+  seconds, including 17 new direct-interface tests.
+- Actual tiny Real and Fourier calls from in-memory candidate bundles, saved
+  bundles and likelihood-ready objects give exactly the same scenario evidence
+  as the existing Python routines with matching settings and seeds.
+- Tests cover optional saving, no-overwrite behavior, input preservation,
+  independent result metadata, explicit false/default options, invalid arguments,
+  target identity and low-level evidence-module import compatibility.
+- The earlier command, covariance, scenario and preserved-engine tests all pass.
+  The 63,319 warnings are inherited scalar-conversion/deprecated-API warnings.
+
+See the [validation record](evidence-api-validation-20261005.json) for source
+and wheel hashes. No production inference, saved FPP or paper result changed.
+The tests establish software equivalence rather than evidence convergence.
+
+```text
+dist/pentaceratops-0.1.0.dev10-py3-none-any.whl
+SHA-256: e92ff8f82ac682a035391e521e1fc984928cc8f078f81365c86934276136b1b5
+dist/evidence-dev10-wheel-tests.xml
+```

@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-05",
+  "version": "0.1.0.dev10",
+  "source_sha256": "9012c2d95c18771b654c55f14893078a768f55d21a2bd158cedde9ecd7014e11",
+  "standalone_wheel": {
+    "file": "dist/pentaceratops-0.1.0.dev10-py3-none-any.whl",
+    "sha256": "e92ff8f82ac682a035391e521e1fc984928cc8f078f81365c86934276136b1b5",
+    "tests": 665,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 98.711,
+    "warnings": 63319
+  },
+  "new_tests": {
+    "count": 17,
+    "coverage": [
+      "actual Real/Fourier evidence from objects, paths and ready inputs equals existing APIs",
+      "optional saving and no overwrite",
+      "input objects are not modified or aliased",
+      "explicit false/default options and invalid settings",
+      "target identity and input-type checks",
+      "function import coexists with existing low-level evidence package"
+    ]
+  },
+  "scope": "Offline synthetic/reference regression; no production sampling or changes to saved FPPs/paper results."
+}

@@ -4,10 +4,18 @@ These examples start from a TIC/TOI or KIC/KOI identifier. Edit `TARGET` near
 the top of `tess_candidate.py` or `kepler_candidate.py`, or use `--target`.
 They download and preprocess photometry; **they do not calculate an FPP**.
 
-Once those files and the stellar field/population inputs are available, the
-separate evidence command is `pentaceratops evidence target.json`. Copy and
-edit [evidence.json](evidence.json); see the [evidence command](../docs/evidence_command.md)
-for Real/Fourier selection and the required stellar CSV columns.
+Once the preparation and stellar-field object are available, call:
+
+```python
+from pentaceratops.evidence import evidence
+results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+```
+
+`prepared` is the returned preparation object or its saved NPZ path. Set
+`likelihood="real"` for Real evidence. See the [Python interface](../docs/evidence_api.md)
+for arguments and results. The optional command-line entry point remains
+`pentaceratops evidence target.json`, with [evidence.json](evidence.json) as a
+configuration template.
 
 ## Quick start
 

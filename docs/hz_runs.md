@@ -1,5 +1,9 @@
 # Folded HZ runs
 
+The direct Python entry point is `evidence(prepared, target=target, likelihood=...)`;
+import it with `from pentaceratops.evidence import evidence`.
+See the [Python interface](evidence_api.md) for accepted objects and results.
+
 For a command-line entry point using these same routines, run
 `pentaceratops evidence target.json`. The [evidence command](evidence_command.md)
 accepts the prepared files below or saved example-script bundles plus explicit
