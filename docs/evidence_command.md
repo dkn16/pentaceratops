@@ -1,10 +1,19 @@
 # Run evidence from prepared files
 
-For a direct Python call without JSON, use
-`from pentaceratops.evidence import evidence`, followed by
-`results = evidence(prepared, target=target, likelihood="fourier")`.
-See the [Python interface](evidence_api.md). The configuration-based CLI below
-is optional.
+For a direct Python call without JSON, load the output of the preprocessing
+script using the exact NPZ path it prints after `Prepared data:`:
+
+```python
+from pentaceratops import RunResult
+from pentaceratops.evidence import evidence
+
+prepared = RunResult.load("/path/to/cache/prepared/<candidate>_<hash>.npz")
+# target is your already prepared stellar-field object for this candidate.
+results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+```
+
+See the [Python interface](evidence_api.md) to create `prepared` directly with
+`prepare_candidate` instead. The configuration-based CLI below is optional.
 
 After preprocessing and supplying the stellar field/population inputs, run:
 

@@ -4,14 +4,21 @@ These examples start from a TIC/TOI or KIC/KOI identifier. Edit `TARGET` near
 the top of `tess_candidate.py` or `kepler_candidate.py`, or use `--target`.
 They download and preprocess photometry; **they do not calculate an FPP**.
 
-Once the preparation and stellar-field object are available, call:
+For the Python workflow, obtain `prepared` directly from preprocessing:
 
 ```python
+from pentaceratops.preprocessing.candidate import prepare_candidate
 from pentaceratops.evidence import evidence
+
+prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
+# target is your already prepared stellar-field object for this candidate.
 results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
 ```
 
-`prepared` is the returned preparation object or its saved NPZ path. Set
+The function returns the preparation object and the path where it was saved.
+If you ran one of the scripts below instead, copy its `Prepared data: ...`
+path and load it with `RunResult.load`, as shown in [Storage and replay](#storage-and-replay).
+You can also pass that path directly to `evidence`. Set
 `likelihood="real"` for Real evidence. See the [Python interface](../docs/evidence_api.md)
 for arguments and results. The optional command-line entry point remains
 `pentaceratops evidence target.json`, with [evidence.json](evidence.json) as a
@@ -169,11 +176,16 @@ Prepared bundles use the pickle-free `RunResult` format:
 
 ```python
 from pentaceratops import RunResult
-saved = RunResult.load("/path/to/cache/prepared/target_hash.npz")
-windows = saved.output["windows"]  # time_even, flux_even, err_even, etc.
-segments = saved.output["segments"]
-settings = saved.metadata["settings"]
+
+# Use the exact NPZ filename printed after "Prepared data:" by the script.
+prepared = RunResult.load("/path/to/cache/prepared/<candidate>_<hash>.npz")
+windows = prepared.output["windows"]  # time_even, flux_even, err_even, etc.
+segments = prepared.output["segments"]
+settings = prepared.metadata["settings"]
 ```
+
+This `prepared` object is the input to `evidence(prepared, target=target, ...)`;
+loading it does not repeat the download or detrending.
 
 Each segment retains its grid, native mask, protected/training masks, cleaned
 flux, MAP trend, final MAP fit input, stellar PSD and white variance. The

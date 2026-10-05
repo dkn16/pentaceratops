@@ -1,10 +1,23 @@
 # Evidence from Python
 
+Create `prepared` with the provided preprocessing function, then pass it to
+`evidence`. In this example, `target` is your already prepared stellar-field
+object for the same candidate; its required attributes are described below.
+
 ```python
+from pentaceratops.preprocessing.candidate import prepare_candidate
 from pentaceratops.evidence import evidence
 
+prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
 results = evidence(prepared, target=target, likelihood="fourier", N=500, steps=50, eb_eta=0.1)
 ```
+
+`prepare_candidate` resolves the ephemeris, downloads photometry when needed,
+detrends and folds it, and saves a preparation bundle. It returns **two values**:
+`prepared` is the in-memory `RunResult`; `prepared_path` is the saved `.npz`
+file. Unpack the pair as shown rather than passing the pair to `evidence`.
+Use your candidate identifier and cache directory in place of the example.
+This preparation step can be expensive; run real targets in a compute allocation.
 
 Use `likelihood="real"` for folded Real evidence. This is a direct Python
 function: it accepts objects, returns a `RunResult`, and needs no JSON file or
@@ -21,21 +34,61 @@ package and its low-level scenario modules available.
 | The dictionary returned by `load_folded_real` | Real |
 | A `FoldedFourierData` object, or its saved directory | Fourier |
 
-With the provided Python preprocessing routine:
+## Reuse preprocessing that has already finished
+
+If you used the provided scripts, for example:
+
+```bash
+python examples/tess_candidate.py --target TOI-700.02 --cache-dir /path/to/cache
+```
+
+copy the exact filename from the script's `Prepared data: ...` output. The
+file is under `<cache_dir>/prepared/` and includes a settings hash; do not
+substitute the native-download cache or guess the hash. The Kepler example
+script prints the same kind of preparation path.
+
+Load that saved bundle without downloading or detrending again:
 
 ```python
-from pentaceratops.preprocessing.candidate import prepare_candidate
+from pentaceratops import RunResult
 from pentaceratops.evidence import evidence
 
-prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
-# target is your already prepared stellar-field object.
+prepared_path = "/path/to/cache/prepared/<candidate>_<hash>.npz"  # Copy the printed path.
+prepared = RunResult.load(prepared_path)
+# target is your already prepared stellar-field object for this candidate.
 results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
 ```
 
-When using the example preprocessing scripts, pass their saved preparation
-path directly in place of `prepared`; no configuration file is needed.
-When calling `prepare_candidate` in Python, unpack its `(result, path)` pair
-as shown above.
+You may also pass `prepared_path` directly as the first argument to `evidence`.
+The same candidate preparation works with `likelihood="real"` or `"fourier"`;
+the evidence function constructs the corresponding covariance from its saved
+PSD and fit state. No preprocessing rerun is needed to switch likelihoods.
+
+For existing likelihood-ready HZ files, create `prepared` using the matching
+loader instead of `RunResult.load`:
+
+```python
+from pentaceratops import load_folded_real
+from pentaceratops.evidence import evidence
+
+prepared = load_folded_real("/path/to/prepared.npz", "/path/to/folded_posterior.npz")
+results = evidence(prepared, target=target, likelihood="real", eb_eta=0.1)
+```
+
+```python
+from pentaceratops import FoldedFourierData
+from pentaceratops.evidence import evidence
+
+# Directory previously written by FoldedFourierData.save(...).
+prepared = FoldedFourierData.load("/path/to/folded_fourier")
+results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+```
+
+The paired Real files and folded Fourier directory are different formats from
+the candidate-script bundle. See [folded HZ preparation](hz_runs.md) for how
+those likelihood-ready products are constructed.
+
+## Stellar-field input
 
 `target` supplies `.mission`, `.stars` and `.trilegal_fname`; it can be an existing
 prepared `Target` or an object with those attributes. `.stars` is the in-memory

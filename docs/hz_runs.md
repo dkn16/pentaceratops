@@ -1,8 +1,20 @@
 # Folded HZ runs
 
-The direct Python entry point is `evidence(prepared, target=target, likelihood=...)`;
-import it with `from pentaceratops.evidence import evidence`.
-See the [Python interface](evidence_api.md) for accepted objects and results.
+For a candidate bundle saved by the example preprocessing scripts, load
+`prepared` from the NPZ filename printed after `Prepared data:`:
+
+```python
+from pentaceratops import RunResult
+from pentaceratops.evidence import evidence
+
+prepared = RunResult.load("/path/to/cache/prepared/<candidate>_<hash>.npz")
+# target is your already prepared stellar-field object for this candidate.
+results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+```
+
+The [Python interface](evidence_api.md) also shows how to create `prepared`
+directly with `prepare_candidate`. The paired Real caches and folded Fourier
+directories used by the adopted HZ runs have their own loaders, shown below.
 
 For a command-line entry point using these same routines, run
 `pentaceratops evidence target.json`. The [evidence command](evidence_command.md)

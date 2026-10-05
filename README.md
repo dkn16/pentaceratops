@@ -7,9 +7,20 @@ persistent sampling.
 **Development version: `0.1.0.dev10`.** Run evidence directly from Python:
 
 ```python
+from pentaceratops.preprocessing.candidate import prepare_candidate
 from pentaceratops.evidence import evidence
+
+prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
+# target is your already prepared stellar-field object for TOI-700.02.
 results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
 ```
+
+`prepare_candidate` downloads and preprocesses the light curve as needed,
+returning the in-memory `prepared` object and its saved NPZ path, `prepared_path`.
+If preprocessing has already been run with an example script, copy the path
+printed after `Prepared data:` and use `prepared = RunResult.load(path)`
+after importing `RunResult` from `pentaceratops`. You can also pass that path
+directly to `evidence`. See [creating and loading prepared inputs](docs/evidence_api.md).
 
 See the [Python interface](docs/evidence_api.md) for input objects and results.
 The optional [command-line workflow](docs/evidence_command.md) also remains
@@ -76,10 +87,12 @@ or the default `--stage prepare` for detrending and plots. Bulk caches go to
 scratch; `--plot-dir` sets a separate plot location. Real-data FGP processing
 and target sweeps should use a compute job; an example Slurm script is provided.
 
-This is **preparation only**, not an automatic FPP run: stellar-field setup,
-conditional FGP posterior factors, and full-period Fourier inputs must still
-be supplied to the [folded inference interfaces](docs/hz_runs.md). Plotted errors currently
-include measurement errors only. See [examples and all options](examples/README.md).
+Each script prints `Prepared data: /.../prepared/<candidate>_<hash>.npz`.
+Load that file as `prepared` or pass its path to `evidence`, along with your
+prepared stellar-field object. The evidence function propagates the saved FGP
+state into the appropriate Real or Fourier covariance. The scripts themselves
+only preprocess; their plotted errors include measurement errors only.
+See [examples and all options](examples/README.md).
 
 ## Run and save an evidence calculation
 

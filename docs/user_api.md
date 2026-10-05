@@ -3,9 +3,19 @@
 The evidence step is available now:
 
 ```python
+from pentaceratops.preprocessing.candidate import prepare_candidate
 from pentaceratops.evidence import evidence
+
+prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
+# target is your already prepared stellar-field object for this candidate.
 results = evidence(prepared, target=target, likelihood="fourier", N=500, steps=50, eb_eta=0.1)
 ```
+
+`prepare_candidate` returns the preparation object and its saved NPZ path.
+To reuse an example script's output, import `RunResult` from `pentaceratops`
+and load the filename printed after `Prepared data:` with
+`prepared = RunResult.load(prepared_path)`. The [Python evidence guide](evidence_api.md)
+shows both routes, plus loaders for existing HZ inputs.
 
 This direct function accepts preprocessing objects or saved preparations and
 returns a `RunResult`, without requiring a configuration file or exporting the
