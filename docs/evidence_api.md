@@ -1,26 +1,17 @@
 # Evidence from Python
 
-Create `prepared` with the provided preprocessing function and load `target`
-from the saved stellar field for the same candidate. The field contains the
-host, nearby sources, aperture dilution, and a TRILEGAL background population.
-If you do not have these files yet, follow [target setup](target_setup.md)
-first; it shows catalog queries, dilution, population preparation, and saving.
+Create the photometry and the TESS stellar field directly from Python. Neither
+CSV needs to be created by hand: `prepare_target` queries the catalog, computes
+aperture dilution, obtains the background population, and saves the field.
+See [target setup](target_setup.md) for options and existing HZ fields.
 
 ```python
-from types import SimpleNamespace
-import pandas as pd
-
+from pentaceratops import prepare_target
 from pentaceratops.preprocessing.candidate import prepare_candidate
 from pentaceratops.evidence import evidence
 
 prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
-# Load the stellar field saved for this candidate (see target setup below).
-candidate = prepared.metadata["settings"]["candidate"]
-target = SimpleNamespace(
-    ID=int(candidate["host_id"]), mission=candidate["mission"],
-    stars=pd.read_csv("/path/to/field/stars.csv"),
-    trilegal_fname="/path/to/field/trilegal.csv",
-)
+target = prepare_target(prepared, output_dir="/path/to/new_field")
 results = evidence(prepared, target=target, likelihood="fourier", N=500, steps=50, eb_eta=0.1)
 ```
 
@@ -59,28 +50,23 @@ file is under `<cache_dir>/prepared/` and includes a settings hash; do not
 substitute the native-download cache or guess the hash. The Kepler example
 script prints the same kind of preparation path.
 
-Load that saved bundle without downloading or detrending again:
+Reload both products without downloading or detrending again:
 
 ```python
-from types import SimpleNamespace
-import pandas as pd
-
-from pentaceratops import RunResult
+from pentaceratops import RunResult, load_target
 from pentaceratops.evidence import evidence
 
-prepared_path = "/path/to/cache/prepared/<candidate>_<hash>.npz"  # Copy the printed path.
-prepared = RunResult.load(prepared_path)
-# Load the stellar field saved for this candidate (see target setup below).
-candidate = prepared.metadata["settings"]["candidate"]
-target = SimpleNamespace(
-    ID=int(candidate["host_id"]), mission=candidate["mission"],
-    stars=pd.read_csv("/path/to/field/stars.csv"),
-    trilegal_fname="/path/to/field/trilegal.csv",
-)
+prepared = RunResult.load("/path/to/cache/prepared/<candidate>_<hash>.npz")
+target = load_target("/path/to/new_field")
 results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
 ```
 
-You may also pass `prepared_path` directly as the first argument to `evidence`.
+`load_target` reads a directory previously written by `prepare_target`. It
+checks the file hashes and needs no network connection. If you only ran the
+light-curve script, create the field once with
+`target = prepare_target(prepared, output_dir="/path/to/new_field")`.
+
+You may also pass the saved NPZ path directly as the first argument to `evidence`.
 The same candidate preparation works with `likelihood="real"` or `"fourier"`;
 the evidence function constructs the corresponding covariance from its saved
 PSD and fit state. No preprocessing rerun is needed to switch likelihoods.

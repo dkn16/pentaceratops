@@ -1,166 +1,128 @@
 # Preparing the stellar-field target
 
-`prepared` contains the light curve and its saved noise model. `target` contains
-the host star, nearby sources, their aperture flux fractions and host-eligibility
-depths, and the path to a TRILEGAL background-star population. The evidence call
-needs both; `prepare_candidate` does not create the stellar field.
-
-For an existing HZ run, reuse its saved stellar table and population, including
-the adopted stellar parameters and any follow-up exclusions. A fresh catalog
-query need not reproduce that field. For a new TESS candidate, the steps below
-create the field files used in the [Python evidence examples](evidence_api.md).
-
-## Create a new TESS field
-
-Install the catalog extra with `python -m pip install -e '.[catalogs]'` from
-the checkout. Catalog queries need network access. Start from the exact bundle
-printed after `Prepared data:` by the preprocessing script, or use the
-`prepared` object returned by `prepare_candidate`.
+Both CSVs can be obtained directly from Python. `prepare_target` returns the
+`target` needed by `evidence` and writes the field files for later reuse:
 
 ```python
-from pathlib import Path
-import numpy as np
-import pandas as pd
-from pentaceratops import RunResult, Target
+from pentaceratops import prepare_target
+from pentaceratops.preprocessing.candidate import prepare_candidate
+from pentaceratops.evidence import evidence
+
+prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
+target = prepare_target(prepared, output_dir="/path/to/new_field")
+results = evidence(prepared, target=target, likelihood="fourier", N=500, steps=50, eb_eta=0.1)
+```
+
+`prepared` holds photometry and its saved noise model. `target` holds the host
+star, nearby sources, aperture dilution and background population. Preparation
+of a new stellar field currently supports **TESS**. Install the catalog extra
+with `python -m pip install -e '.[catalogs]'` from the checkout; new queries need
+network access. Use a compute allocation for light-curve preprocessing.
+
+If the light curve is already prepared, skip `prepare_candidate`: pass its
+`RunResult` or saved NPZ path directly to `prepare_target`.
+
+## What the helper does
+
+1. Reads the TIC host ID and science FITS products from the preparation bundle.
+2. Queries TIC for the host and nearby stars, places the host first, and uses
+   the actual science-file apertures/WCS to calculate dilution and eligibility.
+3. Queries TRILEGAL at the host's coordinates and waits for the population.
+4. Saves `stars.csv`, `trilegal.csv`, and `field.json` in `output_dir`.
+
+`field.json` records the candidate, input FITS hashes, per-sector aperture
+fractions, population provenance and CSV hashes. Access the returned table as
+`target.stars`, its filename as `target.stars_path`, and the population filename
+as `target.trilegal_fname`. No CSV export or configuration file is required to
+pass this object to `evidence`.
+
+The original downloaded FITS files must be available at their saved paths.
+The dilution calculation uses the established 0.75-pixel Gaussian PSF and equal
+sector weighting; see [aperture geometry](aperture-geometry.md). The saved
+`windows["transit_depth"]` is already in the aperture flux frame and is used
+without another CROWDSAP correction. Constructing a catalog `Target(...)`
+alone does not calculate these dilution quantities.
+
+The directory must be new. Existing fields are never overwritten. A failed
+catalog, stellar-parameter, geometry or population check does not publish a
+completed field. There is no fallback that silently omits background scenarios.
+
+## Reuse without network access
+
+```python
+from pentaceratops import RunResult, load_target
+from pentaceratops.evidence import evidence
 
 prepared = RunResult.load("/path/to/cache/prepared/<candidate>_<hash>.npz")
-settings = prepared.metadata["settings"]
-candidate = settings["candidate"]
-if candidate["mission"] != "TESS":
-    raise ValueError("This science-FITS aperture recipe is for TESS.")
+target = load_target("/path/to/new_field")
+results = evidence(prepared, target=target, likelihood="real", eb_eta=0.1)
+```
 
-field_dir = Path("/path/to/field").expanduser().resolve()  # One directory per candidate.
-field_dir.mkdir(parents=True, exist_ok=True)
-population_file = field_dir / "trilegal.csv"
-target = Target(
-    ID=int(candidate["host_id"]), mission="TESS",
-    sectors=np.array([], dtype=int), search_radius=10,
-    trilegal_fname=str(population_file),
+`load_target` verifies the manifest and file hashes. It does not query catalogs,
+read the original FITS, or rerun dilution. The same field can be used for Real
+and Fourier evidence for the same candidate. Save a separate field for each
+candidate: eligibility depends on the candidate's transit depth.
+
+## Optional supplied inputs
+
+Use an existing population to avoid submitting another TRILEGAL job:
+
+```python
+from pentaceratops import prepare_target
+
+target = prepare_target(
+    prepared, output_dir="/path/to/another_new_field",
+    trilegal_fname="/path/to/existing_TRILEGAL.csv",
 )
-
-# TIC may return IDs as strings; inference requires integer IDs and target first.
-stars = target.stars.copy()
-stars["ID"] = pd.to_numeric(stars["ID"], errors="raise").astype("int64")
-is_host = stars["ID"] == target.ID
-if is_host.sum() != 1:
-    raise ValueError("The catalog must contain exactly one row for the target.")
-target.stars = pd.concat([stars[is_host], stars[~is_host]], ignore_index=True)
 ```
 
-`ID` here is the **TIC host ID**, obtained from the saved candidate metadata,
-not the TOI number. The constructor queries TIC for the host and surrounding
-stars. `sectors=[]` deliberately skips independent TessCut downloads: the next
-step uses the FITS products that supplied the light curve. The explicit
-population filename suppresses an automatic TRILEGAL request; an existing file
-is reused, or the population step below creates it.
+The existing population is copied without changing its stellar rows. It must
+correspond to this sky position and retain the two terminal records expected
+by the current likelihood reader. New downloads are saved in that same format.
 
-Check the queried stellar properties and apply any adopted corrections to
-`target.stars` before inference. Mass/radius are in solar units, `Teff` in
-kelvin, `plx` in milliarcseconds, and `ra`/`dec` in degrees. Record the sources
-of corrections and any follow-up exclusions alongside the saved field.
-The default evidence policy rejects missing required properties; it does not
-infer a missing stellar mass or radius from the light-curve bundle.
+Other keyword arguments are:
 
-## Calculate dilution using the actual aperture
+| Argument | Meaning |
+| --- | --- |
+| `stars` | A pandas DataFrame or CSV containing adopted stellar inputs; bypasses TIC. Include `ID, Tmag, Jmag, Hmag, Kmag, ra, dec, mass, rad, Teff, plx`. Dilution is recomputed from the science FITS. |
+| `transit_depth` | Optional measured **dimensionless aperture depth**, required if the saved bundle has no depth. For example, a 1000-ppm aperture depth is `0.001`. |
+| `search_radius=10` | TIC cone radius in TESS pixels, using the existing 20.25-arcsecond convention. |
+| `mag_lim=21` | Limiting magnitude sent to a new TRILEGAL query. |
+| `population_timeout=900` | Maximum seconds polling the result after the TRILEGAL form query. |
+| `poll_interval=10` | Seconds between result checks. |
 
-Continue with the `prepared`, `settings`, and `target` above:
+Supplied stellar inputs use solar mass/radius, kelvin, milliarcsecond parallax
+and RA/Dec degrees. All sources need coordinates and TESS magnitudes for
+aperture dilution. Required properties must be finite for eligible hosts;
+missing mass/radius/temperature values must be supplied from adopted stellar
+information. The helper does not substitute solar values. To correct catalog
+properties, supply a corrected `stars` table and write to a new field directory.
+Record the sources of corrections and follow-up exclusions alongside it.
 
-```python
-from pentaceratops.preprocessing.aperture import geometry_from_fits, dilution_depths
+An optional prepared companion population remains an evidence argument,
+`molusc_file=...`; it is separate from the TRILEGAL background population.
 
-geometries = [
-    geometry_from_fits(
-        product["source_file"], target.stars[["ra", "dec"]].to_numpy(),
-        tic=target.ID, sector=int(product["sector"]),
-    )
-    for product in settings["native_products"]
-]
-depth = prepared.output["windows"].get("transit_depth")
-if depth is None:
-    raise ValueError("Supply a measured transit depth in the normalized aperture flux frame.")
-fraction, host_depth, per_sector = dilution_depths(
-    target.stars["Tmag"].to_numpy(), geometries, transit_depth=float(depth),
-)
-target.stars["fluxratio"] = fraction
-target.stars["tdepth"] = host_depth
-```
+## Existing HZ fields
 
-The original downloaded FITS files must remain available at their recorded
-`source_file` paths. The helper uses each file's pipeline aperture and detector
-WCS, with the same 0.75-pixel Gaussian PSF and equal sector weighting as
-`Target.calc_depths`. See [aperture geometry](aperture-geometry.md).
-
-`transit_depth` is a **dimensionless aperture depth**, not ppm. The preparation
-bundle stores the catalog depth converted to that frame when a catalog depth
-is available. Use that value without applying CROWDSAP again. If it is absent,
-replace the `depth` assignment with a measured depth in the same aperture
-frame. `tdepth` is the intrinsic depth each possible host would require;
-sources requiring a depth greater than one become ineligible. This step is
-needed before evidence: constructing `Target` alone does not populate
-`fluxratio` or `tdepth`.
-
-## Supply or create the background population
-
-Reuse the adopted `trilegal.csv` for an existing field. If you do not have one,
-this continues the setup above using the target's coordinates:
-
-```python
-from pentaceratops.stellar import query_TRILEGAL, save_trilegal
-
-if not population_file.is_file():
-    host = target.stars.iloc[0]
-    # save_trilegal writes <ID>_TRILEGAL.csv in the current working directory.
-    download_file = Path(f"{target.ID}_TRILEGAL.csv")
-    if download_file.exists():
-        raise FileExistsError(f"Move or reuse the existing population: {download_file}")
-    url = query_TRILEGAL(float(host.ra), float(host.dec))
-    if url is None:
-        raise RuntimeError("TRILEGAL is unavailable; obtain the field population before inference.")
-    downloaded = Path(save_trilegal(url, target.ID)).resolve()
-    # Copy to the field directory, including when it is on another filesystem.
-    with downloaded.open("rb") as source, population_file.open("xb") as destination:
-        import shutil
-        shutil.copyfileobj(source, destination)
-target.trilegal_fname = str(population_file)
-```
-
-This is a separate online preparation step and can take time. A population
-must correspond to this sky position and retain the format written by
-`save_trilegal`; an empty placeholder is not a background model. The evidence
-function requires the local population file and does not download it. An
-optional prepared companion population can be supplied separately through
-`molusc_file=...`.
-
-## Save, reload, and run evidence
-
-The object is now ready for `evidence(prepared, target=target, ...)`. Save the
-table for subsequent offline runs:
-
-```python
-target.stars.to_csv(field_dir / "stars.csv", index=False, mode="x")
-```
-
-Later, the full call using the two saved inputs is:
+Reuse the adopted table and population to reproduce an existing HZ field,
+including stellar corrections, dilution and follow-up exclusions. Do not
+replace them with a new catalog query. Old fields without `field.json` can be
+loaded directly for either TESS or Kepler:
 
 ```python
 from types import SimpleNamespace
 import pandas as pd
-from pentaceratops import RunResult
-from pentaceratops.evidence import evidence
 
-prepared = RunResult.load("/path/to/cache/prepared/<candidate>_<hash>.npz")
+# prepared is the corresponding candidate bundle, already loaded above.
 candidate = prepared.metadata["settings"]["candidate"]
 target = SimpleNamespace(
     ID=int(candidate["host_id"]), mission=candidate["mission"],
-    stars=pd.read_csv("/path/to/field/stars.csv"),
-    trilegal_fname="/path/to/field/trilegal.csv",
+    stars=pd.read_csv("/path/to/adopted_stars.csv"),
+    trilegal_fname="/path/to/adopted_TRILEGAL.csv",
 )
-results = evidence(prepared, target=target, likelihood="fourier", N=500, steps=50, eb_eta=0.1)
 ```
 
-`SimpleNamespace` is sufficient because inference reads these attributes; it
-does not need the constructor's catalog-query or plotting methods. Set
-`likelihood="real"` for Real evidence with the same field. This reload route
-also applies to the saved Kepler fields: preserve their existing host ID,
-mission, table, population, and dilution. The new-field aperture recipe above
-is specifically for TESS FITS and must not be applied to Kepler products.
+For older likelihood-ready folded files without candidate metadata, supply
+the host ID and mission recorded by that run. `load_target` is specifically
+for directories produced by `prepare_target`; the new TESS aperture recipe
+must not be applied to Kepler FITS.

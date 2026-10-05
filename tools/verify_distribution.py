@@ -36,6 +36,8 @@ import sys
 import pentaceratops
 assert Path(pentaceratops.__file__).is_relative_to(Path.cwd())
 from pentaceratops import Target, RunResult, run_evidence, run_prepared, scenario_probabilities
+from pentaceratops import prepare_target, load_target
+assert callable(prepare_target) and callable(load_target)
 from pentaceratops.evidence import evidence
 assert callable(evidence)
 from pentaceratops import (load_folded_real, prepare_folded_fourier, FoldedFourierData,

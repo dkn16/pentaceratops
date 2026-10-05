@@ -4,24 +4,16 @@ Statistical validation of transiting planet candidates using competing planet
 and eclipsing-binary scenarios, real-space or Fourier-space likelihoods, and
 persistent sampling.
 
-**Development version: `0.1.0.dev10`.** Run evidence directly from Python:
+**Development version: `0.1.0.dev11`.** Run evidence directly from Python:
 
 ```python
-from types import SimpleNamespace
-import pandas as pd
-
+from pentaceratops import prepare_target
 from pentaceratops.preprocessing.candidate import prepare_candidate
 from pentaceratops.evidence import evidence
 
 prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
-# Load the stellar field saved for this candidate (see target setup below).
-candidate = prepared.metadata["settings"]["candidate"]
-target = SimpleNamespace(
-    ID=int(candidate["host_id"]), mission=candidate["mission"],
-    stars=pd.read_csv("/path/to/field/stars.csv"),
-    trilegal_fname="/path/to/field/trilegal.csv",
-)
-results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+target = prepare_target(prepared, output_dir="/path/to/new_field")
+results = evidence(prepared, target=target, likelihood="fourier", N=500, steps=50, eb_eta=0.1)
 ```
 
 `prepare_candidate` downloads and preprocesses the light curve as needed,
@@ -31,10 +23,12 @@ printed after `Prepared data:` and use `prepared = RunResult.load(path)`
 after importing `RunResult` from `pentaceratops`. You can also pass that path
 directly to `evidence`. See [creating and loading prepared inputs](docs/evidence_api.md).
 
-`stars.csv` contains the host and nearby sources with aperture dilution;
-`trilegal.csv` is the background-star population for that field.
-See [target setup](docs/target_setup.md) to create these files for a new TESS
-candidate, or reuse the corresponding saved HZ field.
+`prepare_target` queries the TESS stellar field, calculates aperture dilution,
+obtains TRILEGAL, and writes `stars.csv`, `trilegal.csv`, and `field.json` in a
+new directory. It returns the `target` directly. Later use
+`target = load_target("/path/to/new_field")` after importing `load_target` from
+`pentaceratops`. See [target setup](docs/target_setup.md) for supplied catalog or
+population inputs and for reusing existing HZ fields.
 
 See the [Python interface](docs/evidence_api.md) for input objects and results.
 The optional [command-line workflow](docs/evidence_command.md) also remains

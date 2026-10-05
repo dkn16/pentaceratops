@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-05",
+  "version": "0.1.0.dev11",
+  "source_sha256": "611ef76b84c2a66ce00f79225855e0ebd01041065e1bf2afe9575edf011d9c87",
+  "standalone_wheel": {
+    "file": "dist/pentaceratops-0.1.0.dev11-py3-none-any.whl",
+    "sha256": "9f8a38cb659ad04712a91b0b54de7a10ca687ec1a5fddb8009c489b5c95ee7fa",
+    "tests": 680,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 88.606
+  },
+  "new_tests": {
+    "count": 15,
+    "coverage": [
+      "science FITS dilution and target-first catalog ordering",
+      "mocked catalog/population services and actual TRILEGAL parser compatibility",
+      "offline reload, hashes, no overwrite, explicit depth and missing-input checks",
+      "failed service/timeout leaves no partial field",
+      "returned target drives actual small Real and Fourier evidence calls"
+    ]
+  },
+  "scope": "Offline synthetic/reference regression with mocked network; no live service jobs, production sampling, or saved FPP/paper changes."
+}
