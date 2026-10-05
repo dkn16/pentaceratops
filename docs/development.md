@@ -36,6 +36,15 @@ Explicit `tests -c pyproject.toml` prevents the reference path from becoming
 pytest's root directory. Comparisons include numerical function bodies,
 physical templates, a seeded toy sampler, and tiny low-SNR TP real/Fourier
 evidence calculations. Tiny effort tests migration, not scientific precision.
+All 52 evidence wrappers delegate to shared host, system, and orbit components.
+Their public signatures remain fixed. `tests/test_all_scenarios.py` compares
+every wrapper's priors, likelihoods, result packing, tiny seeded evidence, and
+full saved pools against the preserved implementation. It includes x2P,
+legacy twins, discrete background/neighbor populations, and empty neighbor
+populations. `tests/test_target_planet.py` and `tests/test_scenario_components.py`
+retain the more detailed pilot tests, including MOLUSC/contrast-curve inputs,
+covariance hooks, and all three sampler modes. Numerical kernels, dispatcher,
+and sampling-policy bodies still undergo the original syntax-tree comparison.
 Long all-scenario or candidate regressions must use the research Slurm
 submission conventions and scratch caches, not a login node.
 
@@ -50,7 +59,7 @@ In a dedicated development environment:
 
 ```bash
 python -m build
-python tools/verify_distribution.py dist/pentaceratops-0.1.0.dev3-py3-none-any.whl
+python tools/verify_distribution.py dist/pentaceratops-0.1.0.dev8-py3-none-any.whl
 ```
 
 If the optional build frontend is unavailable but setuptools is installed,
@@ -58,7 +67,7 @@ an offline check can invoke the backend directly:
 
 ```bash
 python -c 'from setuptools.build_meta import build_wheel; print(build_wheel("/tmp/pentaceratops-dist"))'
-python tools/verify_distribution.py /tmp/pentaceratops-dist/pentaceratops-0.1.0.dev3-py3-none-any.whl
+python tools/verify_distribution.py /tmp/pentaceratops-dist/pentaceratops-0.1.0.dev8-py3-none-any.whl
 ```
 
 Verification unpacks a trusted locally built wheel into a temporary directory,

@@ -30,8 +30,10 @@ class OptimizedAdapter(ModelAdapter):
     calls can supply a keyword override. Exposure duration remains data['exptime'].
     """
 
-    def __init__(self, data, include_gp=True, parity='profile', chunk_size=64, *, nsamples=20):
-        super().__init__(data, include_gp=include_gp, parity=parity, nsamples=nsamples)
+    def __init__(self, data, include_gp=True, parity='profile', chunk_size=64, *,
+                 nsamples=20, timing_policy='legacy'):
+        super().__init__(data, include_gp=include_gp, parity=parity, nsamples=nsamples,
+                         timing_policy=timing_policy)
         self.chunk_size = chunk_size
         self.physical = {}
         self.grids = {}
@@ -114,8 +116,13 @@ class OptimizedAdapter(ModelAdapter):
         n=len(p['P_orb']);out=np.full(n,-np.inf)
         offset=(self.lk.mean_anomaly_difference(p['ecc'],p['argp']*(np.pi/180.))-.5)*p['P_orb']
         if kind=='x2p':
-            half=max(np.max(abs(self.times['even'])),np.max(abs(self.times['odd'])))
-            ids=np.flatnonzero(abs(offset)/2<=half)
+            if self.timing_policy == 'legacy':
+                half=max(np.max(abs(self.times['even'])),np.max(abs(self.times['odd'])))
+                allowed=abs(offset)/2<=half
+            else:
+                from .window_support import alternating_overlap
+                allowed=alternating_overlap(self.times['even'],self.times['odd'],p,self.data['exptime'])
+            ids=np.flatnonzero(allowed)
             if not len(ids):return out
             p={k:v[ids] for k,v in p.items()};offset=offset[ids]
             primary={};secondary={}
@@ -133,8 +140,8 @@ class OptimizedAdapter(ModelAdapter):
             phantom=np.zeros(n)
             if kind=='binary':
                 ts=self.times['secondary'];outside=(offset<ts.min())|(offset>ts.max())
-                # An outside secondary is scored at t0=0 against the same
-                # synthetic flat window as the original v2, not omitted.
+                # Preserve the existing centered-secondary non-detection
+                # constraint under both timing policies.
                 proposal=self.dilute(self.undiluted(p,'secondary',np.where(outside,0.,offset),secondary=True,nsamples=nsamples),p,secondary=True)
                 sec[~outside]=proposal[~outside]
                 phantom[outside]=self.score(proposal[outside],metric='secondary')
@@ -149,7 +156,7 @@ class OptimizedAdapter(ModelAdapter):
         physics=self.make_physics(scalar)
         # Use the SAME integration count as the scalar evidence callback, even
         # when the caller overrides the adapter's default via scenario kwargs.
-        nsamples = self.integration_samples(physics.env.get('nsamples'))
+        nsamples = self.integration_samples(physics.nsamples)
         start=time.perf_counter();out,ids,columns=physics.evaluate(theta)
         self.profile['physics_seconds']+=time.perf_counter()-start
         for lo in range(0,len(ids),self.chunk_size):

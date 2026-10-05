@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-05",
+  "version": "0.1.0.dev8",
+  "source_sha256": "ee72e8d2541eed17db579e8fc8ba2f53279db745ce4dddf8bb1258af1a28ea40",
+  "ordinary_eb": "Existing folded Real secondary treatment preserved; no new 1.5-sigma cutoff",
+  "timing": "Automatic local x2P contact/window support and complete full-orbit Fourier rendering; explicit legacy reproduction",
+  "standalone_wheel": {
+    "file": "dist/pentaceratops-0.1.0.dev8-py3-none-any.whl",
+    "sha256": "df9ec7bfdee4fcd36677becef222382d7fc4476ddec7cc605bef5b40d85eda9c",
+    "tests": 632,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 97.461,
+    "warnings": 63239
+  },
+  "replay": {
+    "file": "hz-timing-replay-20261005.json",
+    "timing_policy": "legacy",
+    "real_tess_scenarios": 172,
+    "folded_tess_fourier_scenarios": 21,
+    "folded_kepler_fourier_scenarios": 18,
+    "max_saved_model_error": 0.0,
+    "max_saved_photometric_gain_error": 0.0,
+    "max_kepler_log_target_error": 0.0,
+    "fpp_absolute_tolerance": 2e-12
+  },
+  "scope": "Synthetic/reference regression and read-only saved-fit replay; no production resampling or paper-result changes."
+}

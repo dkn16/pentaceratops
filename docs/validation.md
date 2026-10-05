@@ -158,3 +158,223 @@ dist/pentaceratops-0.1.0.dev3-py3-none-any.whl
 SHA-256: b2c6d7dbefd890465a5bbc80fb831e33be5d59e8b554f8bb73a1bac94022ef03
 docs/pytransit-wheel-tests.xml
 ```
+
+## Shared TP model: `0.1.0.dev4` (2026-09-29)
+
+The real/Fourier TP wrappers now compose the same host model, priors, geometry,
+sampler call, and result packing. Their public signatures and scientific
+normalizations are unchanged. The fast real-space TP path consumes explicit
+model fields; other scenarios retain their previous implementations.
+
+- **241 tests passed** against the standalone wheel in 56.40 seconds; the
+  source suite also passed (34.11 seconds). Imports and bundled tables work
+  independently of the research checkout. The same isolated PyTransit 2.9.2
+  stack was used, without changing the shared research environment.
+- Forty-seven new tests cover real/Fourier scalar likelihood and prior equality
+  against the preserved code, fixed/ranged periods, TESS/Kepler coefficients,
+  both host-mass radius-prior branches, flat priors, scalar/per-point errors,
+  even/odd Fourier lengths, result packing and its inherited fallback.
+- Existing seeded real/Fourier TP evidence and returned posterior arrays remain
+  exactly equal to the reference. Full weighted pool recording and save/load
+  still pass. Scalar, prior-only, and fully batched sampler modes all execute
+  the shared TP model, and fast exposure comparisons retain their tolerances.
+- Fast TP dispatch is tested with closure inspection deliberately disabled;
+  Fourier callbacks are explicitly rejected by the real-space fast adapter.
+- Focused linting, whitespace checks, and the source audit pass. All 32
+  preserved source files remain unchanged. The 3655 warnings are inherited
+  scalar conversions and deprecated API calls in reference code, now exercised
+  by more differential tests.
+
+This is a structural regression check, not new scientific validation or a
+production FPP rerun. Other planet-host families and the EB families still
+need staged extraction and their own differential tests. See
+[architecture](architecture.md#shared-scenario-components).
+
+Retained artifacts (earlier wheels remain intact):
+
+```text
+dist/pentaceratops-0.1.0.dev4-py3-none-any.whl
+SHA-256: 8339689e20ff8fe5d38ce86fac66f2c54865d99ca3fadb1fcc0616867bc2838e
+docs/tp-refactor-wheel-tests.xml
+```
+
+## Composable scenario pilot: `0.1.0.dev5` (2026-09-30)
+
+TP/STP and the ordinary explicit-secondary EB/SEB wrappers now compose a host
+with a planet or binary system, in both real and Fourier space. Their public
+arguments, prior support, likelihood normalization, timing options, and
+posterior-output policies are preserved. Other hosts, the twin-split routines,
+and x2P paths remain unchanged. See the
+[component boundary](architecture.md#shared-scenario-components).
+
+- **292 tests passed** against the unpacked wheel in 58.00 seconds using
+  single-threaded numerical libraries in the isolated PyTransit 2.9.2 stack.
+  The source suite passed all 283 then-existing tests; the nine subsequently
+  added sampler-mode smoke tests also passed before wheel verification.
+- The 51 new tests cover both composition axes, scalar prior/likelihood
+  equality, fixed/ranged periods, TESS/Kepler coefficients, low-mass hosts,
+  optional MOLUSC populations (including an empty filtered population),
+  contrast curves, per-point errors, and odd/even Fourier lengths.
+- Tiny seeded STP/EB/SEB evidence calculations reproduce the reference outputs
+  exactly in both domains. Full samples, weights, log targets, and evidence
+  survive saving/loading and match the preserved sampler pools. Separate
+  fixed-pool tests check historical posterior resampling and packing.
+- Scalar, batched-prior-only, and fully batched sampler modes execute the
+  composed scenarios and restore their hooks. Fast covariance likelihoods
+  keep the existing scalar-agreement tolerance; closure inspection is disabled
+  deliberately when testing migrated dispatch.
+- Compatibility choices are explicit: real and Fourier companion LDC lookup
+  rules are not unified numerically, nor are target/host inputs to size priors
+  or the combined-light contrast weighting for SEB.
+- Wheel import isolation, bundled tables, linting, formatting, and whitespace
+  checks passed. All 32 preserved research files still match their extraction
+  hashes. No production reruns, catalogue downloads, or shared-environment
+  changes were made. The 9070 warnings are inherited scalar conversions and
+  deprecated API calls, mostly from the preserved reference comparisons.
+
+The final README and one adapter docstring were updated after the full wheel
+suite; the final wheel is rebuilt and smoke-checked with no numerical changes.
+These tests establish structural compatibility on the selected cases, not
+production evidence precision or complete benchmark equivalence.
+
+Retained artifacts (earlier wheels remain intact):
+
+```text
+dist/pentaceratops-0.1.0.dev5-py3-none-any.whl
+SHA-256: ce40372b0fed6085186f96487c49ddd6ca06cf2f6ccfe52f2b601e30cb3d0685
+docs/scenario-components-wheel-tests.xml
+```
+
+## All scenario recipes: `0.1.0.dev6` (2026-09-30)
+
+All 52 public evidence wrappers now use shared host, planet/binary, and orbit
+components. This includes T/P/S/D/B, explicit-secondary and x2P recipes,
+legacy primary-only single/twin branches, and specialized unknown/evolved N
+entry points in both domains. Known nearby stars continue to reuse target
+recipes. Recipe-specific preparation and posterior packing remain in the
+wrappers; their public signatures and output conventions are unchanged.
+
+- **529 tests passed** against the unpacked standalone wheel in 77.03 seconds
+  and in the source suite (61.25 seconds), with one numerical-library thread.
+  The isolated PyTransit 2.9.2 environment and preserved reference were used.
+- The 237 added tests include 156 recipe comparisons: every wrapper with
+  default, catalogue/contrast-curve, and low-mass configurations. Scalar priors,
+  likelihood values, sampler settings, and physical posterior outputs match
+  exactly. Batched transforms/physical columns retain their stated tolerances.
+- Every wrapper also has a tiny seeded sampling/save-load comparison. Evidence,
+  complete samples, weights, and log targets match the preserved engine
+  exactly, including both pools from legacy two-branch calls.
+- Scalar/fast covariance comparisons cover all 15 standard T/P/S/D/B
+  planet/secondary/x2P combinations, plus unknown/evolved-neighbor planet
+  recipes, with closure inspection disabled. Invalid batched particles are
+  rejected without indexing invalid catalogue rows.
+- Nearby-star tests cover empty magnitude-selected populations and hosts
+  failing the logg/temperature cut. The latter remain in the prior population
+  rather than being removed and renormalized.
+- Compatibility details remain explicit: eccentricity is drawn before period
+  doubling; x2P collision policies differ by family; only legacy twins use the
+  q=.95 split; B's distance correction and target-mass radius prior remain;
+  specialized NEB retains its 1-Msun mass-ratio prior. Existing Fourier timing
+  constraints and the legacy scalar `sigma_veto` are forwarded unchanged.
+- Import isolation, bundled tables, linting, formatting, whitespace, and
+  source audit pass. All 32 preserved research source files are unchanged.
+  No production candidate runs, catalogue queries, or dependency changes were
+  made. The 56,718 warnings are inherited scalar conversions and deprecated
+  calls exercised heavily in the preserved reference comparisons.
+
+These are structural compatibility tests, not production evidence-convergence
+or population-level FPP validation. Direct Fourier parity-swap calls still
+require matching grids; legacy primary-only EB requires a scalar veto error.
+The fast backend remains experimental, real-space, fixed-period, and excludes
+legacy primary-only binaries. No sampling defaults or demographic odds changed.
+
+Retained artifacts (earlier versions remain intact):
+
+```text
+dist/pentaceratops-0.1.0.dev6-py3-none-any.whl
+SHA-256: d4366ddb63334e922a847579f16709745b52ccb66bc414035979eb3addc64b4c
+docs/all-scenarios-wheel-tests.xml
+```
+
+## Folded HZ inference: `0.1.0.dev7` (2026-10-05)
+
+Prepared-input interfaces now integrate optimized folded Real and full-orbit
+folded Fourier inference. Historical Kepler full-P/2P and covariance-only
+updates remain explicit, preserving their original grids, scalar sampler,
+priors, and timing limits. See [folded HZ runs](hz_runs.md).
+
+- **612 tests passed**, none skipped, against the standalone wheel in 63.61
+  seconds. All preserved-engine comparisons ran. Wheel imports and bundled
+  tables passed without installing packages or importing the research engine
+  at runtime. The same isolated PyTransit 2.9.2 stack was used.
+- Tests cover covariance propagation through gaps and duplicate fold bins,
+  native exposure weights, mission-specific coefficients, all physical
+  scenario families, nearby-host aperture frames, primary-only inputs,
+  historical grids, actual tiny sampling calls, saved pools and scalar replay.
+- All **172 saved Real best-fit photometric gains** across the seven retained
+  TESS targets replay exactly. All seven Real FPPs reconstruct from the saved
+  evidences to the stated `2e-12` absolute tolerance.
+- All **21 TOI-7390.01 folded Fourier** best-fit models and photometric gains
+  replay exactly. Its reconstructed FPP is `0.11453120078512388` with eta=0.1.
+- All **18 KOI-2719.02 seven-transit Fourier** best-fit models and log targets
+  replay exactly, retaining original priors and EB timing restrictions. Its
+  reconstructed FPP is `0.02963812370424862` with eta=0.1.
+- The inherited reference test's dispatcher inventory now explicitly allows
+  the additional observed-data entry point; every original function body
+  remains checked. Existing numerical tolerances were not relaxed.
+- The 62,979 warnings are inherited scalar-conversion and deprecated-API
+  warnings from the expanded reference/scenario coverage. They are not failed
+  numerical comparisons.
+
+The [machine-readable validation](hz-validation-20261005.json) identifies the
+wheel and runtime source hashes; the [production replay](hz-replay-20261005.json)
+retains individual comparisons. The wheel and pytest XML are retained under
+ignored `dist/`. No paper data or frozen research inputs were modified.
+
+These checks establish prepared-input integration, regression compatibility,
+and saved-production replay. They do not constitute new production sampling,
+evidence-convergence certification, a catalogue-to-FPP pipeline, thread-safe
+inference, or a fresh-environment dependency matrix. The previous licensing
+and attribution release gates also remain.
+
+```text
+dist/pentaceratops-0.1.0.dev7-py3-none-any.whl
+SHA-256: ad8b0155f36e8019af88157441cc5dfed1a1b7239d23b0cff50f79297cbc361f
+dist/hz-dev7-wheel-tests.xml
+```
+
+## Automatic eclipse timing: `0.1.0.dev8` (2026-10-05)
+
+New recorded runs derive local x2P support from eclipse contacts and supplied
+window/exposure boundaries. Full-period Fourier models include both eclipses
+wherever they fall on either half grid, without a fixed duration-based cutoff.
+Explicit legacy settings preserve archived model placement and timing limits.
+The existing ordinary-EB synthetic-secondary Gaussian penalty in folded Real
+is unchanged under both timing settings; no new 1.5-sigma veto was added.
+See [timing and observation coverage](timing.md).
+
+- **632 tests passed**, none skipped, against the standalone wheel in 97.54
+  seconds. This includes all preserved-engine comparisons and 20 timing tests.
+- Timing tests cover x2P edge overlap, asymmetric windows, exposure boundaries,
+  periodic wrapping, gaps, scalar/optimized equality, preserved ordinary-EB
+  secondary constraints, and independent full-orbit model comparisons.
+- The ordinary-EB scalar methods also match their pre-change syntax trees.
+- Actual tiny Fourier sampling checks retained pools and timing-policy
+  recording. These are software tests, not production evidence calculations.
+- In explicit legacy mode, all **172 Real**, **21 TOI-7390.01 Fourier**, and
+  **18 KOI-2719.02 seven-transit Fourier** saved fits replay exactly. Stored
+  evidences reconstruct their FPPs within `2e-12` absolute tolerance.
+- The 63,239 warnings are inherited scalar-conversion/deprecated-API warnings.
+  No numerical comparison tolerances were relaxed.
+
+The [validation record](hz-timing-validation-20261005.json) and
+[individual replay results](hz-timing-replay-20261005.json) identify the final
+runtime source and wheel. The wheel's 63 Python source files match the checked
+source exactly. No production sampler, paper table, or frozen input was updated;
+FPPs under the new timing policy require new inference.
+
+```text
+dist/pentaceratops-0.1.0.dev8-py3-none-any.whl
+SHA-256: df9ec7bfdee4fcd36677becef222382d7fc4476ddec7cc605bef5b40d85eda9c
+dist/hz-dev8-wheel-tests.xml
+```

@@ -6,6 +6,7 @@ The original sampler's unit-cube coordinates must never be mutated.
 import inspect
 import numpy as np
 from scipy.special import betaincinv
+from ..evidence.scenario import ScenarioPrior
 
 
 def closure(fn):
@@ -26,11 +27,13 @@ def population_index(u, size):
 
 
 def make_prior(scalar):
-    """Build a batched transform from a core scenario closure, failing closed.
+    """Use a composed scenario transform or adapt a legacy closure, failing closed.
 
     All existing prior support, population ordering and pre-2P eccentricity
     conventions are preserved. Source hashes pin the closure implementation.
     """
+    if isinstance(scalar, ScenarioPrior):
+        return scalar.batch
     env = closure(scalar)
     if scalar.__name__ == 'prior_transform_twin':
         base = make_prior(env['prior_transform_single'])

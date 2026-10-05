@@ -4,13 +4,20 @@ Statistical validation of transiting planet candidates using competing planet
 and eclipsing-binary scenarios, real-space or Fourier-space likelihoods, and
 persistent sampling.
 
-**Development version: `0.1.0.dev3`.** The standalone numerical engines,
-posterior recording, preprocessing utilities, and experimental CPU-batching
-adapters are implemented. The corrected end-to-end research pipelines are not
-fully integrated yet: a bare `Target.calc_probs(...)` call is **not** a
-replacement for the production benchmark runners. In particular, consistent
-flux frames, null-evidence corrections, and covariance setup remain the
-runner's responsibility. See [architecture and limitations](docs/architecture.md).
+**Development version: `0.1.0.dev8`.** Prepared-input interfaces now support
+folded real-space and full-orbit folded Fourier HZ runs, with consistent aperture
+flux frames, common null references, and recorded weighted posterior pools.
+Use `calc_probs_folded_real` or `calc_probs_folded_fourier` for these workflows;
+see [folded HZ runs](docs/hz_runs.md). The original folded Fourier implementation
+used by both TESS and Kepler also remains supported for reproducing the adopted
+experiments via an explicit reproduction setting. New calls use automatic
+x2P window/exposure overlap and complete orbital Fourier eclipse models,
+without a fixed three-duration timing cut. The existing ordinary-EB secondary
+penalty in folded Real is preserved. See [timing and observation coverage](docs/timing.md).
+
+Catalog downloading, transit selection, and PSD/conditional-trend preparation
+remain explicit preceding steps. The compatibility `Target.calc_probs(...)`
+interface retains its old behavior; it does not apply the corrected HZ workflow.
 
 ## Installation
 
@@ -61,8 +68,8 @@ scratch; `--plot-dir` sets a separate plot location. Real-data FGP processing
 and target sweeps should use a compute job; an example Slurm script is provided.
 
 This is **preparation only**, not an automatic FPP run: stellar-field setup,
-corrected scenario orchestration, FGP covariance propagation, and full-period
-Fourier-likelihood inputs are not yet integrated. Plotted errors currently
+conditional FGP posterior factors, and full-period Fourier inputs must still
+be supplied to the [folded inference interfaces](docs/hz_runs.md). Plotted errors currently
 include measurement errors only. See [examples and all options](examples/README.md).
 
 ## Run and save an evidence calculation
@@ -147,7 +154,9 @@ for corrected scenario evidence.
 
 ## Fast CPU backend and exposure integration
 
-The fast backend is **experimental and opt-in**, not the default. It batches
+Low-level fast adapters are opt-in. The prepared-input folded HZ interfaces
+select the optimized adapters explicitly; compatibility entry points retain
+their previous defaults. It batches
 prior transformations and physical/photometric calculations for the
 matched-window real-space workflow, with or without FGP covariance. It is
 not a different scientific likelihood.
@@ -160,9 +169,10 @@ not a different scientific likelihood.
 
 Nearby-source scenarios reuse the target-star kernels with the appropriate
 host inputs. This is kernel support, not a promise that the standalone
-catalog runner already reproduces every corrected research result. A fast
-Fourier backend, legacy primary-only EB likelihood, and specialized
-unknown/evolved-host routines are not included in this adapter.
+catalog runner already reproduces every corrected research result. The [folded HZ interfaces](docs/hz_runs.md) separately integrate optimized
+full-orbit Fourier and observed-primary-only real-space adapters. The legacy
+primary-only EB likelihood remains outside this matched-window adapter. Specialized unknown/evolved-neighbor planet recipes also have
+scalar/fast checks; their legacy binary recipes remain scalar-only.
 
 The fast adapter requires a **fixed P**, or **2P** for even/odd scenarios.
 Exposure integration is configurable:
@@ -222,9 +232,10 @@ validation stage and do not replace the planned three-stage interface.
 
 ```text
 src/pentaceratops/
-  api.py, results.py       Recorded interfaces and portable result bundles
+  api.py, hz.py, results.py  Recorded interfaces and portable result bundles
   likelihoods/            Transit models and real/Fourier residual costs
-  evidence/               Scenario-specific priors and evidence integrals
+  models/                 Composable host and planet/binary ingredients
+  evidence/               Shared callbacks and scenario evidence wrappers
   sampling/               Persistent sampler and provisional effort policy
   preprocessing/          Aperture-frame restoration and sector FGP utilities
   companions/, data/      Stellar-companion machinery and small model tables
@@ -239,9 +250,18 @@ is ignored by Git and packaging.
 
 ## Tests and provenance
 
-The `0.1.0.dev3` wheel passed **194 tests** on 2026-09-29 with PyTransit 2.9.2,
-including preserved-engine comparisons, result save/load, scalar/fast exposure
-regressions, and download/preparation tests. A separate 240-template
+All **52 evidence wrappers** now use composed host, planet/binary, and orbit
+components: T/P/S/D/B families, x2P and legacy twin branches, and specialized
+unknown/evolved N hosts, in both real and Fourier space. Known nearby stars
+reuse the target recipes. Public signatures and scientific conventions are
+preserved; recipe-specific input preparation and posterior packing remain in
+the wrappers. See the
+[shared model boundary](docs/architecture.md#shared-scenario-components).
+Differential checks cover every wrapper's priors, likelihoods, seeded evidence,
+posterior outputs, and complete saved weighted pools. The fast-path checks
+cover all 15 standard host/system combinations without closure inspection.
+Test counts and artifacts are recorded in the [validation record](docs/validation.md).
+A separate 240-template
 old/new-dependency comparison is recorded in the [upgrade notes](docs/pytransit.md).
 Earlier live NASA lookups and one-product downloads for both missions, plus
 an optional Bayesian TESS lookup, also succeeded.
@@ -267,3 +287,11 @@ remain in `../pentaceratops_research`; they are not modified by this package.
 `LICENSE` preserves the upstream MIT notice; experimental exposure kernels
 also carry GPL-3.0-or-later notices. Public-release licensing and bundled-table
 attribution review remain pending; see `NOTICE` and file-level notices.
+
+The opt-in [joint Fourier likelihood](docs/joint_fourier.md) fits gapped, observed
+light curves without eclipse-window splitting and preserves alternating eclipses.
+
+[Aperture geometry from science FITS](docs/aperture-geometry.md) avoids mixing
+TessCut and photometric detector coordinates near CCD boundaries.
+
+Primary-only conditional-FGP v2 for targets without secondary-window observations is described in [docs/primary-only-v2.md](docs/primary-only-v2.md).

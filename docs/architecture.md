@@ -54,12 +54,100 @@ in the research repository as independent references, not runtime dependencies.
   asymmetric contact bounds. Scalar calls use the supported `evaluate` API.
   Result records include PyTransit/MeepMeep/Numba versions. This dependency
   change is not bitwise identical to historical runs; see [upgrade checks](pytransit.md).
+- All real/Fourier evidence wrappers compose shared host, planet/binary, and
+  orbit components, including x2P and legacy twin branches. Fast paths read explicit
+  model fields rather than inferring the scenario from closure variables and
+  function names. Scientific conventions and public signatures are preserved.
+  TP additionally shares its sampler call and posterior packing; the other
+  migrated wrappers retain their original result-packing policies.
 
-Reference tests compare numerical function bodies (allowing the documented
-shape fix and `evaluate_ps` to `evaluate` API rename), physical templates,
-a seeded sampler, and small real/Fourier TP
-evidence calculations. These are migration tests, not a claim that every
-scientific assumption or every scenario has been validated.
+Reference tests compare unmigrated numerical function bodies (allowing the
+documented shape fix and `evaluate_ps` to `evaluate` API rename), physical
+templates, a seeded sampler, and tiny evidence calculations for every wrapper.
+For the migrated wrappers, differential prior/likelihood/result tests replace
+body-identity checks; signature checks remain. These are migration tests, not
+a claim that every scientific assumption or every scenario has been validated.
+
+## Shared scenario components
+
+Scenarios share code along independent host, system, and orbit axes, without
+a scenario-class inheritance tree:
+
+| Host component | Planet | Binary with secondary window | Even/odd at 2P |
+| --- | --- | --- | --- |
+| `KnownHost` | TP | EB | EBx2P |
+| `DilutedBoundHost` | PTP | PEB | PEBx2P |
+| `BoundCompanionHost` | STP | SEB | SEBx2P |
+| `BackgroundHost`, target eclipsed | DTP | DEB | DEBx2P |
+| `BackgroundHost`, background eclipsed | BTP | BEB | BEBx2P |
+| `KnownHost`, nearby-star inputs | NTP | NEB | NEBx2P |
+
+The specialized unknown-property N wrappers use `UnknownHost` with a discrete
+magnitude-selected population. Evolved N wrappers use a `KnownHost` with the
+inherited logg=3 mass inference. Their legacy primary-only EB/twin branches
+are also composed; no new secondary/even-odd API is invented for these fallbacks.
+
+- `models.hosts` prepares stellar properties, limb-darkening lookup, optional
+  companion populations, target-relative dilution, and contrast-curve inputs.
+  Catalogue/table preparation happens once, outside likelihood evaluation.
+- `models.populations` supplies discrete background/neighbor selection,
+  catalogue LDC lookup, distance-corrected secondary light, and background
+  weights. Population order and the historical base-10 prior are retained.
+- `models.systems` supplies `Planet`, `Binary`, shared orbital geometry, and
+  their composition with a host as `Scenario`. The system selects its size
+  prior and the appropriate companion-weight function; SEB contrast weighting
+  includes both eclipsing stars, whereas STP uses only its companion host.
+- `OrbitPolicy` records candidate-to-orbit period scaling, collision rules,
+  legacy mass-ratio cuts, and whether observations are even/odd windows.
+  Eccentricity is drawn at the candidate period before doubling. Windowed
+  x2P recipes have no q=.95 split; legacy single/twin recipes do. Windowed
+  B-family x2P uses the sum of component radii for collision rejection, while
+  T/P/S/D use twice the host radius. Legacy twins all retain twice-host-radius
+  rejection. None of these differences is silently harmonized.
+- `evidence.scenario.ScenarioPrior` maps the same five or six unit-cube
+  coordinates to physical parameters. Inclinations remain isotropic before
+  geometry cuts; fixed period still occupies a coordinate. No prior
+  conditioning or demographic reweighting is introduced.
+- `ScenarioLikelihood` supplies explicit observation/noise, normalization,
+  residual-cost callback, and optional secondary-window inputs. The same
+  physical derivation serves scalar and batched evaluations. Real-space
+  standard deviations and Fourier complex variances remain distinct.
+- `evidence.target_planet` is now a small construction/packing facade over
+  these ingredients, not a new public runner API. Other result-packing blocks
+  stay in their wrappers: their resampling, best-fit placement,
+  posterior counts, and fallback policies are intentionally not unified yet.
+  Full weighted pools are still recorded externally.
+
+All 52 public evidence functions in the four evidence modules are migrated,
+including the duplicated specialized-N compatibility entry points. Signatures, Fourier
+preparation, and domain-specific normalizations remain in the wrappers.
+Experimental covariance hooks still supply the residual callback and null
+normalization; the shared model does not choose an evidence frame. The original
+fast real-space adapter remains fixed-P. The prepared-input HZ interfaces also
+integrate the full-orbit folded Fourier adapter; see [folded HZ runs](hz_runs.md).
+
+Compatibility is explicit where recipes differ. Fourier STP and SEB retain
+their rounded limb-darkening grids and respective 10,000/13,000 K ceilings;
+real-space companion hosts retain nearest-available coefficients. STP's radius
+prior uses the companion mass, while SEB's mass-ratio prior and secondary
+temperature cap retain the target-star inputs used by the reference engine.
+This is preservation, not an endorsement or correction of those differences.
+
+BTP still uses the target mass for its radius prior, unlike STP's companion
+mass. Unknown/evolved NEB keeps its 1-Msun mass-ratio-prior input. A rejected
+unknown host stays in the population prior: the logg/temperature cut belongs
+to the likelihood, not a renormalized catalogue. Empty nearby populations
+retain the original impossible-evidence outputs.
+
+Fast dispatch uses explicit metadata for all standard T/P/S/D/B combinations
+and known nearby stars, and is tested for the specialized N planet recipes.
+The closure adapters remain only for compatibility with older callbacks and
+reference comparisons. Legacy primary-only binary recipes and Fourier
+callbacks are explicitly rejected by the fast real-space adapter.
+
+Remaining structural work is to consolidate recipe-specific input preparation
+and result packing without erasing their historical output differences. Do not
+infer a new prior or collision rule merely from similar transit templates.
 
 ## Scientific conventions
 
@@ -99,10 +187,13 @@ across incompatible host frames.
 `experimental.covariance.GaussianMetric` implements a same-data, flat-model-null
 log-likelihood ratio with covariance `diag(sigma**2) + U @ U.T`, preserving
 cross-window covariance. End-to-end use requires the matching model adapter,
-window ordering, and corrected preprocessing. PSD/noise hyperparameters are
+window ordering, and corrected preprocessing. `load_folded_real` checks the
+paired caches and `calc_probs_folded_real` supplies the optimized adapter,
+aperture-frame comparison, null reference, and probability reporting.
+PSD/noise hyperparameters are
 fixed in the conditional FGP posterior; their uncertainty is not integrated out.
 
-### Fourier likelihood
+### Fourier coefficient conventions
 
 Retained coefficients are the complex positive-frequency coefficients of
 NumPy's unnormalized real FFT. DC and the purely real Nyquist coefficient
@@ -122,15 +213,29 @@ residual term, not just a determinant. Half-split/even-odd frame alignment is
 also retained. Use the comparable final column, not a raw per-sampler
 `log_evidence`, for scenario probabilities.
 
+The full-orbit folded interface instead retains the native PSD's Gaussian
+covariance through the observed folding operator, with the same operator on
+exposure-integrated models. Empty bins are absent and no additional modes are
+removed. The separate historical folded-covariance interface preserves the
+original model grids and explicit nuisance-mode projection. Both conventions
+and their replay checks are described in [folded HZ runs](hz_runs.md).
+
 ### Even/odd and secondary hypotheses
 
 Ordinary scenarios retain concatenated even/odd observations and corresponding
-per-point errors; x2P scenarios receive separate grids. The established
-trimming and parity-choice conventions remain: this extraction does not turn
+per-point errors; x2P scenarios receive separate grids. Archived
+trimming and parity-choice conventions remain available: this extraction does not turn
 the best of two parity assignments into a parity-marginalized likelihood.
+The inherited Fourier parity-swap kernel requires matching even/odd grids,
+as prepared by its dispatcher; direct calls with unequal grids are unsupported.
+Legacy Fourier primary-only EB recipes also retain a scalar time-domain
+`sigma_veto` for the secondary-depth veto, separate from their Fourier powers.
 
-The optional secondary-outside-window flat-data treatment and Fourier
-anomaly-shift argument are preserved. Preprocessing must protect the data
+The ordinary EB secondary-outside-window flat-data treatment is preserved
+under both timing policies. The Fourier anomaly-shift argument remains
+available for explicit reproduction. Standard recorded folded calls use
+[observed timing](timing.md), including partial x2P eclipse overlap and
+complete full-period Fourier EB models. Preprocessing must protect the data
 appropriate to the chosen workflow. The package does not infer a new window
 or timing prior from a candidate identifier.
 
@@ -140,7 +245,8 @@ Use one process per target. Legacy model caches, module-level settings, and
 NumPy's global RNG mean the engine is **not thread-safe**. Context-local
 recording does not remove this constraint. Experimental adapters also patch
 engine globals temporarily and must not run concurrently in threads. CPU
-batching remains opt-in under `experimental`.
+batching remains opt-in under `experimental` for low-level compatibility use;
+the prepared-input HZ APIs select their optimized adapters explicitly.
 
 An explicit `run_evidence(..., seed=...)` temporarily sets and restores the
 NumPy RNG state. Without a seed, the ordinary global RNG behavior remains.
@@ -149,10 +255,12 @@ broad regressions belong in Slurm; small unit tests are local.
 
 ## Remaining release gates
 
-1. Extract one corrected benchmark runner with frame/null bookkeeping,
-   sector-aware preprocessing, and input validation.
-2. Reproduce representative complete TESS/Kepler scenario tables, beyond the
-   small TP and kernel migration tests.
+1. Integrate catalogue-to-input orchestration with the prepared-input folded
+   inference interfaces; preserve explicit selection and noise-model provenance.
+2. Extend saved-production replay to fresh seeded full-effort scenario tables
+   across representative TESS/Kepler targets and assess evidence convergence.
+   Saved real fits for all seven retained TESS targets and both adopted Fourier
+   folding updates are covered by the current replay tool.
 3. Make model/data contracts and independent RNGs explicit before claiming
    thread-safe use or enabling batching by default.
 4. Review companion-table licensing/attribution and supported dependency

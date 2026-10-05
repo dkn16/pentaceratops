@@ -27,7 +27,10 @@ derived physical quantities are in the evidence event output. Single/twin
 calls may have two pools; callback names and event ordering distinguish them.
 Nearby hosts can share an evidence function; the high-level table supplies
 host labels and event inputs supply numerical context. A stable per-scenario-ID
-record schema is a future improvement.
+record schema for compatibility calls remains a future improvement. The folded
+HZ interfaces already provide `metadata["scenario_records"]["ID:scenario"]`,
+including best fits and weighted/equal-weight physical pools, separately from
+pandas attributes. See [folded HZ runs](hz_runs.md).
 
 `log_target` is deliberately **not** called `log_posterior`: some scenarios
 include additional companion/population weights in the integrand. Nor should

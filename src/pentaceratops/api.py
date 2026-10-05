@@ -69,14 +69,36 @@ def run_evidence(function, *args, output_path=None, seed=None, metadata=None, **
     return result
 
 
-def calc_probs_fourier(*args, output_path=None, seed=None, **kwargs):
+def calc_probs_fourier(*args, output_path=None, seed=None, timing_policy="observed", **kwargs):
     """Return a RunResult containing the Fourier scenario table and full pools.
 
-    All numerical arguments follow ``pentaceratops.fourier.calc_probs_fourier``.
-    Its returned table has explicit null-referenced ``lnBF`` and FPP attributes.
+    Numerical arguments follow ``pentaceratops.fourier.calc_probs_fourier``.
+    The default renders both eclipses on every full-period grid, without a
+    duration-based timing cut. ``timing_policy="legacy"`` preserves the archived
+    renderer and accepts its explicit max_anomaly_shift. The resulting table
+    has null-referenced lnBF and records the selected timing policy.
     """
+    import inspect
+    from contextlib import nullcontext
+    from .likelihoods.observed_fourier import observed_fourier_engine
     from .fourier import calc_probs_fourier as calculate
-    return run_evidence(calculate, *args, output_path=output_path, seed=seed, **kwargs)
+    if output_path is not None:
+        RunResult.check_destination(output_path)
+    if timing_policy not in ("observed", "legacy"):
+        raise ValueError("timing_policy must be observed or legacy")
+    bound = inspect.signature(calculate).bind(*args, **kwargs)
+    limit = bound.arguments.get("max_anomaly_shift")
+    if timing_policy == "observed" and limit is not None:
+        raise ValueError("An explicit timing cut requires timing_policy='legacy'")
+    context = observed_fourier_engine() if timing_policy == "observed" else nullcontext()
+    with context:
+        result = run_evidence(calculate, *args, seed=seed,
+                              metadata=dict(timing_policy=timing_policy, max_anomaly_shift=limit), **kwargs)
+    result.output.attrs["timing_policy"] = timing_policy
+    result.output.attrs["max_anomaly_shift"] = limit
+    if output_path is not None:
+        result.save(output_path)
+    return result
 
 
 def _target_class():

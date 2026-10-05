@@ -92,8 +92,12 @@ def load_inputs(row, folded_root):
 
 
 class ModelAdapter:
-    def __init__(self, data, include_gp=True, mean="conditional", parity="profile", *, nsamples=20):
+    def __init__(self, data, include_gp=True, mean="conditional", parity="profile", *,
+                 nsamples=20, timing_policy="legacy"):
         self.nsamples = _validate_nsamples(nsamples)
+        if timing_policy not in ("observed", "legacy"):
+            raise ValueError("timing_policy must be observed or legacy")
+        self.timing_policy = timing_policy
         from ..likelihoods import real as lk
         from .._target import _centered_secondary_model_new
         self.lk = lk
@@ -201,8 +205,13 @@ class ModelAdapter:
                           exptime=exptime, nsamples=nsamples)
         offset = float((self.lk.mean_anomaly_difference(ecc, np.deg2rad(argp)) - .5) * P_orb)
         te, to = self.times["even"], self.times["odd"]
-        half = max(np.max(np.abs(te)), np.max(np.abs(to)))
-        if abs(offset) / 2 > half:
+        if self.timing_policy == "legacy":
+            half = max(np.max(np.abs(te)), np.max(np.abs(to)))
+            allowed = abs(offset)/2 <= half
+        else:
+            from .window_support import alternating_overlap
+            allowed = bool(alternating_overlap(te, to, parameters, exptime)[0])
+        if not allowed:
             return np.inf
         e1, o2 = self.lk.simulate_EB_transit_evenodd(te, to, **parameters)
         o1, e2 = self.lk.simulate_EB_transit_evenodd(to, te, **parameters)

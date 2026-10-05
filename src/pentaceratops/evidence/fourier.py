@@ -28,14 +28,39 @@ eccentricity ICDF) is imported from marginal_likelihoods_new so this module
 only carries the per-scenario prior/likelihood logic.
 """
 
+from ..models.hosts import (
+    Star as _Star,
+    KnownHost as _KnownHost,
+    BoundCompanionHost as _BoundCompanionHost,
+    DilutedBoundHost as _DilutedBoundHost,
+)
+from ..models.populations import (
+    BackgroundHost as _BackgroundHost,
+    UnknownHost as _UnknownHost,
+)
+from ..models.systems import (
+    Scenario as _Scenario,
+    Planet as _Planet,
+    Binary as _Binary,
+    OrbitPolicy as _OrbitPolicy,
+)
+from .scenario import (
+    ScenarioPrior as _ScenarioPrior,
+    ScenarioLikelihood as _ScenarioLikelihood,
+)
+
 import os
 import numpy as np
+from ..models.systems import (
+    period_range as _period_range,
+)
 from pandas import read_csv
 from astropy import constants
 
 from ..likelihoods.real import *
 from ..likelihoods.fourier import *
 from ..priors import *
+from .target_planet import TargetPlanet, TargetPlanetLikelihood, run_target_planet
 from ..stellar import stellar_relations, flux_relation
 from ..evidence.real import (
     ldc_T, ldc_K,
@@ -91,180 +116,30 @@ def lnZ_TTP_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
             Z: float, N: int = 10, steps: int = 20,
             mission: str = "TESS", flatpriors: bool = False,
             exptime: float = 0.00139, nsamples: int = 20):
+    """TP evidence with shared priors, geometry, sampling, and result packing.
+
+    A scalar P_orb fixes the period; a sequence supplies uniform endpoints.
+    N controls active particles, steps controls MCMC effort, and nsamples
+    controls exposure integration. Public arguments and result keys are
+    unchanged. sigma is retained for API compatibility but is unused for TP.
     """
-    Calculates the marginal likelihood of the TTP scenario.
-    Persistent sampling usage:
-      - nlive: number of active particles (default 20). Increase for better sampling.
-      - dlogz: not used, target_ess set to nlive.
-      - dynamic: not used.
-    Period handling: if P_orb is a 2-tuple, we assume Uniform(P_min, P_max); if scalar, P is fixed.
-    Args:
-        time (numpy array): Time of each data point
-                            [days from transit midpoint].
-        flux (numpy array): Normalized flux of each data point.
-        sigma (float): Normalized flux uncertainty.
-        P_orb (float): Orbital period [days].
-        M_s (float): Target star mass [Solar masses].
-        R_s (float): Target star radius [Solar radii].
-        Teff (float): Target star effective temperature [K].
-        Z (float): Target star metallicity [dex].
-        N (int): Number of draws for MC.
-        steps (int): Number of steps for MCMC.
-        mission (str): TESS, Kepler, or K2.
-        flatpriors (bool): Assume flat Rp and Porb planet priors?
-        exptime (float): Exposure time of observations [days].
-        nsamples (int): Sampling rate for supersampling.
-    Returns:
-        res (dict): Best-fit properties and marginal likelihood.
-    """
-    # For evidence, we'll treat either fixed P_orb or a uniform range
-    if type(P_orb) in [float, int]:
-        P_orb_range = (float(P_orb), float(P_orb))
-    else:
-        P_orb_range = (float(P_orb[0]), float(P_orb[-1]))
-
-    lnsigma = np.log(sigma)
-    # a depends on P_orb; will be computed per-sample inside loglike
-    logg = np.log10(G*(M_s*Msun)/(R_s*Rsun)**2)
-    # determine target star limb darkening coefficients
-    if mission == "TESS":
-        ldc_Zs = ldc_T_Zs
-        ldc_Teffs = ldc_T_Teffs
-        ldc_loggs = ldc_T_loggs
-        ldc_u1s = ldc_T_u1s
-        ldc_u2s = ldc_T_u2s
-    else:
-        ldc_Zs = ldc_K_Zs
-        ldc_Teffs = ldc_K_Teffs
-        ldc_loggs = ldc_K_loggs
-        ldc_u1s = ldc_K_u1s
-        ldc_u2s = ldc_K_u2s
-    this_Z = ldc_Zs[np.argmin(np.abs(ldc_Zs-Z))]
-    this_Teff = ldc_Teffs[np.argmin(np.abs(ldc_Teffs-Teff))]
-    this_logg = ldc_loggs[np.argmin(np.abs(ldc_loggs-logg))]
-    mask = (
-        (ldc_Zs == this_Z)
-        & (ldc_Teffs == this_Teff)
-        & (ldc_loggs == this_logg)
-        )
-    u1, u2 = ldc_u1s[mask], ldc_u2s[mask]
-
-    # Build dynesty prior transform and log-likelihood
-    # Parameterization: theta = [u_P, u_inc, u_ecc, u_argp, u_rp]
-    # where u_* are in [0,1]. We transform to physical values using
-    # the existing prior samplers.
-
-    flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
-
-    def prior_transform(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, urp = u
-        # P_orb
-        if P_orb_range[0] == P_orb_range[1]:
-            P = P_orb_range[0]
-        else:
-            P = P_orb_range[0] + uP * (P_orb_range[1] - P_orb_range[0])
-        # Eccentricity and argp
-        ecc = _inv_sample_ecc(float(uecc), planet=True, P_orb=P)
-        #ecc = float(sample_ecc(np.array([uecc]), planet=True, P_orb=P)[0])
-        argp = float(sample_w(np.array([uargp]))[0])
-        # Sample rp
-        rp = float(sample_rp(np.array([urp]), np.array([M_s]), flatpriors)[0])
-        # Inclination prior on [0, 90] degrees.
-        # Transit geometry (inc >= inc_min) is enforced in the likelihood
-        # so the evidence includes the geometric transit probability.
-        inc = float(sample_inc(np.array([uinc]), lower=0.0, upper=90.0)[0])
-        return np.array([P, inc, ecc, argp, rp])
-
-    def loglike(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, rp = theta
-        a = ((G*M_s*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        # Transit probability / geometry checks
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (rp*Rearth + R_s*Rsun)/a * e_corr
-        if Ptra > 1.0:
-            return -np.inf
-        # collision check
-        if (rp*Rearth + R_s*Rsun) > a*(1-ecc):
-            return -np.inf
-        # min inclination to transit
-        #if Ptra <= 1.0:
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        #else:
-        #    inc_min = 0.0
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_TP_fourier(
-            time, flux_ft, var_ft, rp, P, inc, a, R_s, u1, u2,
-            ecc, argp_, exptime=exptime, nsamples=nsamples
-        )
-        return float(lnL)
-
-    #u = np.array([0.5,  0.9964872937794484, 0.09987218797188613, 0.045427036113811825, 0.17504388466655085])
-    #print(prior_transform(u))
-    #print(loglike(prior_transform(u)))
-
-    #u = np.array([P_orb_range[0], 0.9946931766323459, 0.5734859411160013, 0.9182614005552816, 0.9863205269412394])
-    #print(loglike(prior_transform(u)))
-
-    # run persistent sampling
-    lnZ, results = _run_persistent_evidence(
-        loglike, prior_transform, ndim=5,
-        n_active=N, target_ess=2 * N, mcmc_steps=steps,
+    ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS" else
+        (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
     )
-
-    #print(lnZ)
-    # Best samples: take top N from weighted samples as representatives
-    N_samples = POSTERIOR_NSAMPLES
-    try:
-        wsamps = _resample_equal(results.samples, results.weights, log_likelihoods=results.log_likelihoods)
-        # compute b for these
-        P = wsamps[:,0]
-        inc = wsamps[:,1]
-        ecc = wsamps[:,2]
-        argp_ = wsamps[:,3]
-        rp = wsamps[:,4]
-        a_arr = ((G*M_s*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        r = a_arr*(1-ecc**2)/(1+ecc*np.sin(argp_*np.pi/180))
-        b = r*np.cos(inc*pi/180)/(R_s*Rsun)
-        # Select up to N_samples
-        sel = slice(0, min(N_samples, wsamps.shape[0]))
-        res = {
-            'M_s': np.full(min(N_samples, wsamps.shape[0]), M_s),
-            'R_s': np.full(min(N_samples, wsamps.shape[0]), R_s),
-            'u1': np.full(min(N_samples, wsamps.shape[0]), u1),
-            'u2': np.full(min(N_samples, wsamps.shape[0]), u2),
-            'P_orb': P[sel],
-            'inc': inc[sel],
-            'b': b[sel],
-            'R_p': rp[sel],
-            'ecc': ecc[sel],
-            'argp': argp_[sel],
-            'M_EB': np.zeros(min(N_samples, wsamps.shape[0])),
-            'R_EB': np.zeros(min(N_samples, wsamps.shape[0])),
-            'fluxratio_EB': np.zeros(min(N_samples, wsamps.shape[0])),
-            'fluxratio_comp': np.zeros(min(N_samples, wsamps.shape[0])),
-            'lnZ': float(lnZ)
-        }
-    except Exception:
-        res = {
-            'M_s': np.array([M_s]),
-            'R_s': np.array([R_s]),
-            'u1': np.array([u1]),
-            'u2': np.array([u2]),
-            'P_orb': np.array([P_orb_range[0]]),
-            'inc': np.array([90.0]),
-            'b': np.array([0.0]),
-            'R_p': np.array([1.0]),
-            'ecc': np.array([0.0]),
-            'argp': np.array([90.0]),
-            'M_EB': np.array([0.0]),
-            'R_EB': np.array([0.0]),
-            'fluxratio_EB': np.array([0.0]),
-            'fluxratio_comp': np.array([0.0]),
-            'lnZ': float(lnZ)
-        }
-    res['best_lnL'] = float(np.max(results.log_likelihoods))
-    return res
+    model = TargetPlanet.prepare(P_orb, M_s, R_s, Teff, Z, flatpriors, ldc)
+    flux_ft, var_ft, normalization = _build_fourier_data(flux, var_fourier)
+    observation = TargetPlanetLikelihood(
+        model=model, time=time, data=flux_ft, noise=var_ft,
+        normalization=normalization, residual_cost=lnL_TP_fourier,
+        exptime=exptime, nsamples=nsamples, domain="fourier",
+    )
+    return run_target_planet(
+        model, observation, _inv_sample_ecc, sampler=_run_persistent_evidence,
+        resample=_resample_equal, n_active=N, steps=steps,
+        posterior_count=POSTERIOR_NSAMPLES,
+    )
 
 
 def lnZ_TEB_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
@@ -290,7 +165,7 @@ def lnZ_TEB_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         R_s (float): Target star radius [Solar radii].
         Teff (float): Target star effective temperature [K].
         Z (float): Target star metallicity [dex].
-        N (int): Number of particles.
+        N (int): Number of active particles.
         steps (int): Number of steps for MCMC.
         mission (str): TESS, Kepler, or K2.
         flatpriors (bool): Assume flat Rp and Porb planet priors?
@@ -335,86 +210,62 @@ def lnZ_TEB_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
     # theta = [uP, uinc, uecc, uargp, uq, umode]
     # umode is ignored in transform but we'll compute both single and twin
 
-    def _q_from_u(uq: float) -> float:
-        # Use sample_q via inverse transform by searching u in [0,1]
-        # We approximate using direct sampler on a single value
-        return float(sample_q(np.array([uq]), M_s)[0])
 
     flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
 
-    def prior_transform_single(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, uq = u
-        if P_orb_range[0] == P_orb_range[1]:
-            P = P_orb_range[0]
-        else:
-            P = P_orb_range[0] + uP * (P_orb_range[1] - P_orb_range[0])
-        inc = float(sample_inc(np.array([uinc]))[0])
-        ecc = _inv_sample_ecc(float(uecc), planet=False, P_orb=P)
-        argp = float(sample_w(np.array([uargp]))[0])
-        q = _q_from_u(float(uq))
-        return np.array([P, inc, ecc, argp, q])
-
-    def loglike_single(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q = theta
-        # only q < 0.95 branch
-        if q >= 0.95:
-            return -np.inf
-        masses = q*M_s
-        radii, _ = stellar_relations(np.array([masses]), np.array([R_s]), np.array([Teff]))
-        radii = float(radii[0])
-        fluxratio = float(
-            flux_relation(np.array([masses]))
-            / (flux_relation(np.array([masses])) + flux_relation(np.array([M_s])))
-        )
-        a = ((G*(M_s+masses)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        # geometry checks
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (radii*Rsun + R_s*Rsun)/a * e_corr
-        if Ptra > 1.0:
-            return -np.inf
-        if (radii*Rsun + R_s*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_fourier(
-            time, flux_ft, var_ft, sigma, radii, fluxratio, P, inc, a, R_s, u1, u2,
-            ecc, argp_, exptime=exptime, nsamples=nsamples
-        )
-        return float(lnL)
-
-    def prior_transform_twin(u: np.ndarray) -> np.ndarray:
-        # twin branch uses 2*P
-        vals = prior_transform_single(u)
-        vals[0] = 2.0*vals[0]
-        return vals
-
-    def loglike_twin(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q = theta
-        if q < 0.95:
-            return -np.inf
-        masses = q*M_s
-        radii, _ = stellar_relations(np.array([masses]), np.array([R_s]), np.array([Teff]))
-        radii = float(radii[0])
-        fluxratio = float(
-            flux_relation(np.array([masses]))
-            / (flux_relation(np.array([masses])) + flux_relation(np.array([M_s])))
-        )
-        a = ((G*(M_s+masses)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (radii*Rsun + R_s*Rsun)/a * e_corr
-        if Ptra > 1.0:
-            return -np.inf
-        if (2*R_s*Rsun) > a*(1-ecc):  # conservative collision for twin
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_twin_fourier(
-            time, flux_ft, var_ft, radii, fluxratio, P, inc, a, R_s, u1, u2,
-            ecc, argp_, exptime=exptime, nsamples=nsamples
-        )
-        return float(lnL)
+    _ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS"
+        else (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
+    )
+    _host = _KnownHost(_Star(M_s, R_s, Teff, u1, u2))
+    _model_loglike_single = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=None),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=1.0,
+            doubled_host_collision=False,
+            q_branch="single",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_single = _ScenarioPrior(_model_loglike_single, _inv_sample_ecc)
+    loglike_single = _ScenarioLikelihood(
+        model=_model_loglike_single,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+        cost_options=dict(sigma_veto=sigma),
+    )
+    _model_loglike_twin = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=None),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=2.0,
+            doubled_host_collision=True,
+            q_branch="twin",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_twin = _ScenarioPrior(_model_loglike_twin, _inv_sample_ecc)
+    loglike_twin = _ScenarioLikelihood(
+        model=_model_loglike_twin,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_twin_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+    )
 
     lnZ_single, res_s = _run_persistent_evidence(
         loglike_single, prior_transform_single, ndim=5,
@@ -512,7 +363,7 @@ def lnZ_PTP_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         contrast_curve_file (string): Path to contrast curve file.
         filt (string): Photometric filter of contrast curve. Options
                          are TESS, Vis, J, H, and K.
-        N (int): Number of particles.
+        N (int): Number of active particles.
         steps (int): Number of steps for MCMC.
         mission (str): TESS, Kepler, or K2.
         flatpriors (bool): Assume flat Rp and Porb planet priors?
@@ -563,26 +414,9 @@ def lnZ_PTP_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         molusc_qs[molusc_qs < 0.1/M_s] = 0.1/M_s
 
     # Build prior transform: [uP, uinc, uecc, uargp, urp, uqcomp]
-    def _qcomp_from_u(uq: float) -> float:
-        if molusc_qs is not None and molusc_qs.size > 0:
-            # discrete selection
-            idx = int(np.floor(np.clip(uq, 1e-12, 1-1e-12) * molusc_qs.size))
-            idx = min(idx, molusc_qs.size-1)
-            return float(molusc_qs[idx])
-        else:
-            return float(sample_q_companion(np.array([uq]), M_s)[0])
 
     flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
 
-    def prior_transform(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, urp, uq = u
-        P = P_orb_range[0] + uP*(P_orb_range[1]-P_orb_range[0]) if P_orb_range[0] != P_orb_range[1] else P_orb_range[0]
-        inc = float(sample_inc(np.array([uinc]))[0])
-        ecc = _inv_sample_ecc(float(uecc), planet=True, P_orb=P)
-        argp_ = float(sample_w(np.array([uargp]))[0])
-        rp = float(sample_rp(np.array([urp]), np.array([M_s]), flatpriors)[0])
-        qcomp = _qcomp_from_u(float(uq))
-        return np.array([P, inc, ecc, argp_, rp, qcomp])
 
     # Preload contrast curve data if provided
     if contrast_curve_file is not None:
@@ -590,51 +424,48 @@ def lnZ_PTP_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
     else:
         separations, contrasts = np.array([2.2]), np.array([1.0])
 
-    def companion_lnprior(mass_comp: float) -> float:
-        # flux ratio and delta mag depend on chosen filter
-        if contrast_curve_file is None:
-            fr_cc = flux_relation(np.array([mass_comp]))/(flux_relation(np.array([mass_comp]))+flux_relation(np.array([M_s])))
-        else:
-            fr_cc = flux_relation(np.array([mass_comp]), filt)/(flux_relation(np.array([mass_comp]), filt)+flux_relation(np.array([M_s]), filt))
-        delta_mag = float(2.5*np.log10(fr_cc/(1-fr_cc)))
-        if mission.upper() in ("TESS", "K2", "KEPLER"):
-            lnpr = float(lnprior_bound_TP(M_s, plx, np.array([abs(delta_mag)]), separations, contrasts)[0])
-        else:
-            lnpr = float(lnprior_bound_TP(M_s, plx, np.array([abs(delta_mag)]), separations, contrasts)[0])
-        if lnpr > 0.0 or delta_mag > 0.0:
-            return -np.inf
-        return lnpr
-
-    def loglike(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, rp, qcomp = theta
-        if qcomp <= 0.0:
-            return -np.inf
-        M_comp = qcomp*M_s
-        R_comp, _ = stellar_relations(np.array([M_comp]), np.array([R_s]), np.array([Teff]))
-        R_comp = float(R_comp[0])
-        # flux ratios in TESS band for dilution in transit
-        fr = float(
-            flux_relation(np.array([M_comp]))
-            / (flux_relation(np.array([M_comp])) + flux_relation(np.array([M_s])))
-        )
-        a = ((G*M_s*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (rp*Rearth + R_s*Rsun)/a * e_corr
-        if Ptra > 1.0:
-            return -np.inf
-        if (rp*Rearth + R_s*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_TP_fourier(
-            time, flux_ft, var_ft, rp, P, inc, a, R_s, u1, u2,
-            ecc, argp_, companion_fluxratio=fr, companion_is_host=False,
-            exptime=exptime, nsamples=nsamples
-        )
-        # add companion prior factor
-        lnL += companion_lnprior(M_comp)
-        return float(lnL)
+    _ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS"
+        else (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
+    )
+    _host = _DilutedBoundHost(
+        _KnownHost(_Star(M_s, R_s, Teff, u1, u2)),
+        _BoundCompanionHost.from_prepared(
+            _Star(M_s, R_s, Teff, None, None),
+            Z,
+            _ldc,
+            plx,
+            separations,
+            contrasts,
+            None if contrast_curve_file is None else filt,
+            molusc_qs,
+            ldc_rule="nearest",
+        ),
+    )
+    _model_loglike = _Scenario(
+        _host,
+        _Planet(flatpriors, radius_prior_on_target=False),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=1.0,
+            doubled_host_collision=False,
+            q_branch="all",
+            observation_kind="standard",
+        ),
+    )
+    prior_transform = _ScenarioPrior(_model_loglike, _inv_sample_ecc)
+    loglike = _ScenarioLikelihood(
+        model=_model_loglike,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_TP_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+    )
 
     lnZ, results = _run_persistent_evidence(
         loglike, prior_transform, ndim=6,
@@ -714,7 +545,7 @@ def lnZ_PEB_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         contrast_curve_file (string): Path to contrast curve file.
         filt (string): Photometric filter of contrast curve. Options
                          are TESS, Vis, J, H, and K.
-        N (int): Number of particles.
+        N (int): Number of active particles.
         steps (int): Number of steps for MCMC.
         mission (str): TESS, Kepler, or K2.
         flatpriors (bool): Assume flat Rp and Porb planet priors?
@@ -765,13 +596,6 @@ def lnZ_PEB_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         molusc_qs = molusc_df2["mass ratio"].values
         molusc_qs[molusc_qs < 0.1/M_s] = 0.1/M_s
 
-    def _qcomp_from_u(uq: float) -> float:
-        if molusc_qs is not None and molusc_qs.size > 0:
-            idx = int(np.floor(np.clip(uq, 1e-12, 1-1e-12) * molusc_qs.size))
-            idx = min(idx, molusc_qs.size-1)
-            return float(molusc_qs[idx])
-        else:
-            return float(sample_q_companion(np.array([uq]), M_s)[0])
 
     # Preload contrast curve data if provided
     if contrast_curve_file is not None:
@@ -779,110 +603,80 @@ def lnZ_PEB_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
     else:
         separations, contrasts = np.array([2.2]), np.array([1.0])
 
-    def companion_lnprior(mass_comp: float) -> float:
-        # Compute delta mag in chosen filter and bound companion prior
-        if contrast_curve_file is None:
-            fr_cc = flux_relation(np.array([mass_comp]))/(flux_relation(np.array([mass_comp]))+flux_relation(np.array([M_s])))
-        else:
-            fr_cc = flux_relation(np.array([mass_comp]), filt)/(flux_relation(np.array([mass_comp]), filt)+flux_relation(np.array([M_s]), filt))
-        delta_mag = float(2.5*np.log10(fr_cc/(1-fr_cc)))
-        lnpr = float(lnprior_bound_EB(M_s, plx, np.array([abs(delta_mag)]), separations, contrasts)[0])
-        if lnpr > 0.0 or delta_mag > 0.0:
-            return -np.inf
-        return lnpr
 
     # dynesty prior/likelihood for single and twin branches
     # theta = [uP, uinc, uecc, uargp, uq, uqcomp]
     flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
 
-    def prior_transform_single(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, uq, uqcomp = u
-        # P_orb
-        if P_orb_range[0] == P_orb_range[1]:
-            P = P_orb_range[0]
-        else:
-            P = P_orb_range[0] + uP * (P_orb_range[1] - P_orb_range[0])
-        inc = float(sample_inc(np.array([uinc]))[0])
-        ecc = _inv_sample_ecc(float(uecc), planet=False, P_orb=P)
-        argp_ = float(sample_w(np.array([uargp]))[0])
-        q = float(sample_q(np.array([uq]), M_s)[0])
-        qcomp = _qcomp_from_u(float(uqcomp))
-        return np.array([P, inc, ecc, argp_, q, qcomp])
-
-    def loglike_single(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q, qcomp = theta
-        if q >= 0.95:
-            return -np.inf
-        masses = q*M_s
-        radii, _ = stellar_relations(np.array([masses]), np.array([R_s]), np.array([Teff]))
-        radii = float(radii[0])
-        fluxratio = float(
-            flux_relation(np.array([masses]))
-            / (flux_relation(np.array([masses])) + flux_relation(np.array([M_s])))
-        )
-        M_comp = qcomp*M_s
-        fr_comp = float(
-            flux_relation(np.array([M_comp]))
-            / (flux_relation(np.array([M_comp])) + flux_relation(np.array([M_s])))
-        )
-        a = ((G*(M_s+masses)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (radii*Rsun + R_s*Rsun)/a * e_corr
-        if Ptra > 1.0:
-            return -np.inf
-        if (radii*Rsun + R_s*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_fourier(
-            time, flux_ft, var_ft, sigma, radii, fluxratio, P, inc, a, R_s, u1, u2,
-            ecc, argp_, companion_fluxratio=fr_comp, companion_is_host=False,
-            exptime=exptime, nsamples=nsamples
-        )
-        lnL += companion_lnprior(M_comp)
-        return float(lnL)
-
-    def prior_transform_twin(u: np.ndarray) -> np.ndarray:
-        vals = prior_transform_single(u)
-        vals[0] = 2.0*vals[0]
-        return vals
-
-    def loglike_twin(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q, qcomp = theta
-        if q < 0.95:
-            return -np.inf
-        masses = q*M_s
-        radii, _ = stellar_relations(np.array([masses]), np.array([R_s]), np.array([Teff]))
-        radii = float(radii[0])
-        fluxratio = float(
-            flux_relation(np.array([masses]))
-            / (flux_relation(np.array([masses])) + flux_relation(np.array([M_s])))
-        )
-        M_comp = qcomp*M_s
-        fr_comp = float(
-            flux_relation(np.array([M_comp]))
-            / (flux_relation(np.array([M_comp])) + flux_relation(np.array([M_s])))
-        )
-        a = ((G*(M_s+masses)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (radii*Rsun + R_s*Rsun)/a * e_corr
-        if Ptra > 1.0:
-            return -np.inf
-        if (2*R_s*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_twin_fourier(
-            time, flux_ft, var_ft, radii, fluxratio, P, inc, a, R_s, u1, u2,
-            ecc, argp_, companion_fluxratio=fr_comp, companion_is_host=False,
-            exptime=exptime, nsamples=nsamples
-        )
-        lnL += companion_lnprior(M_comp)
-        return float(lnL)
 
     # Run nested sampling for both branches
+    _ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS"
+        else (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
+    )
+    _host = _DilutedBoundHost(
+        _KnownHost(_Star(M_s, R_s, Teff, u1, u2)),
+        _BoundCompanionHost.from_prepared(
+            _Star(M_s, R_s, Teff, None, None),
+            Z,
+            _ldc,
+            plx,
+            separations,
+            contrasts,
+            None if contrast_curve_file is None else filt,
+            molusc_qs,
+            ldc_rule="nearest",
+        ),
+    )
+    _model_loglike_single = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=None),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=1.0,
+            doubled_host_collision=False,
+            q_branch="single",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_single = _ScenarioPrior(_model_loglike_single, _inv_sample_ecc)
+    loglike_single = _ScenarioLikelihood(
+        model=_model_loglike_single,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+        cost_options=dict(sigma_veto=sigma),
+    )
+    _model_loglike_twin = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=None),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=2.0,
+            doubled_host_collision=True,
+            q_branch="twin",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_twin = _ScenarioPrior(_model_loglike_twin, _inv_sample_ecc)
+    loglike_twin = _ScenarioLikelihood(
+        model=_model_loglike_twin,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_twin_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+    )
+
     lnZ_single, res_s = _run_persistent_evidence(
         loglike_single, prior_transform_single, ndim=6, n_active=N, target_ess=2 * N, mcmc_steps=steps
     )
@@ -968,132 +762,32 @@ def lnZ_STP_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
             exptime: float = 0.00139, nsamples: int = 20,
             molusc_file: str = None):
     """
-    Calculates the marginal likelihood of the STP scenario using nested sampling.
+    Calculates the marginal likelihood of the STP scenario using persistent sampling.
     Planet transits the bound stellar companion (companion is the host).
     Returns representative samples and lnZ.
     """
-    # Period handling
-    if type(P_orb) in [float, int]:
-        P_orb_range = (float(P_orb), float(P_orb))
-    else:
-        P_orb_range = (float(P_orb[0]), float(P_orb[-1]))
-
-    lnsigma = np.log(sigma)
-
-    # MOLUSC q_comp sampling (optional)
-    molusc_qs = None
-    if molusc_file is not None:
-        molusc_df = read_csv(molusc_file)
-        molusc_a = molusc_df["semi-major axis(AU)"].values
-        molusc_e = molusc_df["eccentricity"].values
-        molusc_df2 = molusc_df[molusc_a*(1-molusc_e) > 10]
-        molusc_qs = molusc_df2["mass ratio"].values
-        molusc_qs[molusc_qs < 0.1/M_s] = 0.1/M_s
-
-    def _qcomp_from_u(uq: float) -> float:
-        if molusc_qs is not None and molusc_qs.size > 0:
-            idx = int(np.floor(np.clip(uq, 1e-12, 1-1e-12) * molusc_qs.size))
-            idx = min(idx, molusc_qs.size-1)
-            return float(molusc_qs[idx])
-        else:
-            return float(sample_q_companion(np.array([uq]), M_s)[0])
-
-    # Preload contrast curve if provided
-    if contrast_curve_file is not None:
-        separations, contrasts = file_to_contrast_curve(contrast_curve_file)
-    else:
-        separations, contrasts = np.array([2.2]), np.array([1.0])
-
-    # Limb-darkening grid accessors
-    if mission == "TESS":
-        _ldc_Zs, _ldc_Teffs, _ldc_loggs = ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs
-        _ldc_u1s, _ldc_u2s = ldc_T_u1s, ldc_T_u2s
-        ldc_at_Z = ldc_T[(_ldc_Zs == _ldc_Zs[np.abs(_ldc_Zs - Z).argmin()])]
-        Teffs_at_Z = np.array(ldc_at_Z.Teff, dtype=int)
-        loggs_at_Z = np.array(ldc_at_Z.logg, dtype=float)
-        u1s_at_Z = np.array(ldc_at_Z.aLSM, dtype=float)
-        u2s_at_Z = np.array(ldc_at_Z.bLSM, dtype=float)
-    else:
-        _ldc_Zs, _ldc_Teffs, _ldc_loggs = ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs
-        _ldc_u1s, _ldc_u2s = ldc_K_u1s, ldc_K_u2s
-        ldc_at_Z = ldc_K[(_ldc_Zs == _ldc_Zs[np.abs(_ldc_Zs - Z).argmin()])]
-        Teffs_at_Z = np.array(ldc_at_Z.Teff, dtype=int)
-        loggs_at_Z = np.array(ldc_at_Z.logg, dtype=float)
-        u1s_at_Z = np.array(ldc_at_Z.a, dtype=float)
-        u2s_at_Z = np.array(ldc_at_Z.b, dtype=float)
-
-    def _comp_ldc(M_comp: float) -> tuple:
-        R_comp, Teff_comp = stellar_relations(np.array([M_comp]), np.array([R_s]), np.array([Teff]))
-        R_comp = float(R_comp[0])
-        Teff_comp = float(Teff_comp[0])
-        logg_comp = float(np.log10(G*(M_comp*Msun)/(R_comp*Rsun)**2))
-        # Round to grid (STP used upper Teff clamp 10000)
-        r_logg = np.clip(np.round(logg_comp/0.5)*0.5, 3.5, 5.0)
-        r_Teff = np.clip(np.round(Teff_comp/250)*250, 3500, 10000)
-        mask = (Teffs_at_Z == r_Teff) & (loggs_at_Z == r_logg)
-        u1 = float(u1s_at_Z[mask]) if np.any(mask) else float(u1s_at_Z[0])
-        u2 = float(u2s_at_Z[mask]) if np.any(mask) else float(u2s_at_Z[0])
-        return R_comp, u1, u2
-
-    def companion_lnprior(mass_comp: float) -> float:
-        # Flux ratio in chosen filter for contrast curve prior
-        if contrast_curve_file is None:
-            fr_cc = flux_relation(np.array([mass_comp]))/(flux_relation(np.array([mass_comp]))+flux_relation(np.array([M_s])))
-        else:
-            fr_cc = flux_relation(np.array([mass_comp]), filt)/(flux_relation(np.array([mass_comp]), filt)+flux_relation(np.array([M_s]), filt))
-        delta_mag = float(2.5*np.log10(fr_cc/(1-fr_cc)))
-        lnpr = float(lnprior_bound_TP(M_s, plx, np.array([abs(delta_mag)]), separations, contrasts)[0])
-        if lnpr > 0.0 or delta_mag > 0.0:
-            return -np.inf
-        return lnpr
-
-    # Prior transform: [uP, uinc, uecc, uargp, urp, uqcomp]
+    # Shared physical ingredients; this wrapper retains the evidence frame.
+    P_orb_range = _period_range(P_orb)
+    ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS" else
+        (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
+    )
+    host = _BoundCompanionHost.prepare(
+        M_s, R_s, Teff, Z, ldc, plx, contrast_curve_file, filt, molusc_file,
+        ldc_rule="rounded_10000",
+    )
+    model = _Scenario(host, _Planet(flatpriors), P_orb_range)
     flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
-
-    def prior_transform(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, urp, uq = u
-        P = P_orb_range[0] + uP*(P_orb_range[1]-P_orb_range[0]) if P_orb_range[0] != P_orb_range[1] else P_orb_range[0]
-        inc = float(sample_inc(np.array([uinc]))[0])
-        ecc = _inv_sample_ecc(float(uecc), planet=True, P_orb=P)
-        argp_ = float(sample_w(np.array([uargp]))[0])
-        qcomp = _qcomp_from_u(float(uq))
-        # rp prior depends on host mass which is M_comp (companion)
-        M_comp = qcomp*M_s
-        rp = float(sample_rp(np.array([urp]), np.array([M_comp]), flatpriors)[0])
-        return np.array([P, inc, ecc, argp_, rp, qcomp])
-
-    def loglike(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, rp, qcomp = theta
-        if qcomp <= 0.0:
-            return -np.inf
-        M_comp = qcomp*M_s
-        R_comp, u1c, u2c = _comp_ldc(M_comp)
-        # Dilution flux ratio in TESS band
-        fr_comp = float(
-            flux_relation(np.array([M_comp]))
-            / (flux_relation(np.array([M_comp])) + flux_relation(np.array([M_s])))
-        )
-        a = ((G*M_comp*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (rp*Rearth + R_comp*Rsun)/a * e_corr
-        if Ptra > 1.0:
-            return -np.inf
-        if (rp*Rearth + R_comp*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_TP_fourier(
-            time, flux_ft, var_ft, rp, P, inc, a, R_comp, u1c, u2c,
-            ecc, argp_, companion_fluxratio=fr_comp, companion_is_host=True,
-            exptime=exptime, nsamples=nsamples
-        )
-        lnL += companion_lnprior(M_comp)
-        return float(lnL)
-
+    prior = _ScenarioPrior(model, _inv_sample_ecc)
+    loglike = _ScenarioLikelihood(
+        model=model, time=time, data=flux_ft, noise=var_ft,
+        normalization=norm_const, residual_cost=lnL_TP_fourier,
+        exptime=exptime, nsamples=nsamples, domain="fourier",
+    )
     lnZ, results = _run_persistent_evidence(
-        loglike, prior_transform, ndim=6,
-        n_active=N, target_ess=2 * N, mcmc_steps=steps
+        loglike, prior, ndim=model.ndim,
+        n_active=N, target_ess=2*N, mcmc_steps=steps,
     )
 
     # Representative outputs
@@ -1186,7 +880,7 @@ def lnZ_SEB_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         contrast_curve_file (string): Path to contrast curve file.
         filt (string): Photometric filter of contrast curve. Options
                          are TESS, Vis, J, H, and K.
-        N (int): Number of particles.
+        N (int): Number of active particles.
         steps (int): Number of steps for MCMC.
         mission (str): TESS, Kepler, or K2.
         flatpriors (bool): Assume flat Rp and Porb planet priors?
@@ -1220,142 +914,79 @@ def lnZ_SEB_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         molusc_qs = molusc_df2["mass ratio"].values
         molusc_qs[molusc_qs < 0.1/M_s] = 0.1/M_s
 
-    def _qcomp_from_u(uq: float) -> float:
-        if molusc_qs is not None and molusc_qs.size > 0:
-            idx = int(np.floor(np.clip(uq, 1e-12, 1-1e-12) * molusc_qs.size))
-            idx = min(idx, molusc_qs.size-1)
-            return float(molusc_qs[idx])
-        else:
-            return float(sample_q_companion(np.array([uq]), M_s)[0])
 
     # limb darkening accessor based on companion mass
-    def _comp_props_and_ldc(M_comp: float) -> tuple:
-        R_comp, Teff_comp = stellar_relations(np.array([M_comp]), np.array([R_s]), np.array([Teff]))
-        R_comp = float(R_comp[0]); Teff_comp = float(Teff_comp[0])
-        logg_comp = float(np.log10(G*(M_comp*Msun)/(R_comp*Rsun)**2))
-        if mission == "TESS":
-            ldc_at_Z = ldc_T[(ldc_T_Zs == ldc_T_Zs[np.abs(ldc_T_Zs - Z).argmin()])]
-            Teffs_at_Z = np.array(ldc_at_Z.Teff, dtype=int)
-            loggs_at_Z = np.array(ldc_at_Z.logg, dtype=float)
-            u1s_at_Z = np.array(ldc_at_Z.aLSM, dtype=float)
-            u2s_at_Z = np.array(ldc_at_Z.bLSM, dtype=float)
-        else:
-            ldc_at_Z = ldc_K[(ldc_K_Zs == ldc_K_Zs[np.abs(ldc_K_Zs - Z).argmin()])]
-            Teffs_at_Z = np.array(ldc_at_Z.Teff, dtype=int)
-            loggs_at_Z = np.array(ldc_at_Z.logg, dtype=float)
-            u1s_at_Z = np.array(ldc_at_Z.a, dtype=float)
-            u2s_at_Z = np.array(ldc_at_Z.b, dtype=float)
-        r_logg = np.clip(np.round(logg_comp/0.5)*0.5, 3.5, 5.0)
-        r_Teff = np.clip(np.round(Teff_comp/250)*250, 3500, 13000)
-        mask = (Teffs_at_Z == r_Teff) & (loggs_at_Z == r_logg)
-        u1 = float(u1s_at_Z[mask][0] if np.any(mask) else u1s_at_Z[0])
-        u2 = float(u2s_at_Z[mask][0] if np.any(mask) else u2s_at_Z[0])
-        return R_comp, u1, u2
 
-    def companion_lnprior(M_comp: float, M_eb: float) -> float:
-        # Build combined delta-mag for EB+host system
-        if contrast_curve_file is None:
-            fr_host = flux_relation(np.array([M_comp]))/(flux_relation(np.array([M_comp]))+flux_relation(np.array([M_s])))
-            fr_eb = flux_relation(np.array([M_eb]))/(flux_relation(np.array([M_eb]))+flux_relation(np.array([M_s])))
-        else:
-            fr_host = flux_relation(np.array([M_comp]), filt)/(flux_relation(np.array([M_comp]), filt)+flux_relation(np.array([M_s]), filt))
-            fr_eb = flux_relation(np.array([M_eb]), filt)/(flux_relation(np.array([M_eb]), filt)+flux_relation(np.array([M_s]), filt))
-        delta_mag = float(2.5*np.log10((fr_host/(1-fr_host)) + (fr_eb/(1-fr_eb))))
-        lnpr = float(lnprior_bound_EB(M_s, plx, np.array([abs(delta_mag)]), separations, contrasts)[0])
-        if lnpr > 0.0 or delta_mag > 0.0:
-            return -np.inf
-        return lnpr
 
     # theta = [uP, uinc, uecc, uargp, uq, uqcomp]
     flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
 
-    def prior_transform_single(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, uq, uqcomp = u
-        P = P_orb_range[0] + uP*(P_orb_range[1]-P_orb_range[0]) if P_orb_range[0] != P_orb_range[1] else P_orb_range[0]
-        inc = float(sample_inc(np.array([uinc]))[0])
-        ecc = _inv_sample_ecc(float(uecc), planet=False, P_orb=P)
-        argp_ = float(sample_w(np.array([uargp]))[0])
-        q = float(sample_q(np.array([uq]), M_s)[0])
-        qcomp = _qcomp_from_u(float(uqcomp))
-        return np.array([P, inc, ecc, argp_, q, qcomp])
-
-    def loglike_single(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q, qcomp = theta
-        if q >= 0.95:
-            return -np.inf
-        M_comp = qcomp*M_s
-        R_comp, u1c, u2c = _comp_props_and_ldc(M_comp)
-        M_eb = q*M_comp
-        R_eb, _ = stellar_relations(np.array([M_eb]), np.array([R_comp]), np.array([Teff]))
-        R_eb = float(R_eb[0])
-        fr_eb = float(
-            flux_relation(np.array([M_eb]))
-            / (flux_relation(np.array([M_eb])) + flux_relation(np.array([M_s])))
-        )
-        fr_host = float(
-            flux_relation(np.array([M_comp]))
-            / (flux_relation(np.array([M_comp])) + flux_relation(np.array([M_s])))
-        )
-        a = ((G*(M_comp+M_eb)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (R_eb*Rsun + R_comp*Rsun)/a * e_corr
-        if Ptra > 1.0:
-            return -np.inf
-        if (R_eb*Rsun + R_comp*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_fourier(
-            time, flux_ft, var_ft, sigma, R_eb, fr_eb, P, inc, a, R_comp, u1c, u2c,
-            ecc, argp_, companion_fluxratio=fr_host, companion_is_host=True,
-            exptime=exptime, nsamples=nsamples
-        )
-        lnL += companion_lnprior(M_comp, M_eb)
-        return float(lnL)
-
-    def prior_transform_twin(u: np.ndarray) -> np.ndarray:
-        vals = prior_transform_single(u)
-        vals[0] = 2.0*vals[0]
-        return vals
-
-    def loglike_twin(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q, qcomp = theta
-        if q < 0.95:
-            return -np.inf
-        M_comp = qcomp*M_s
-        R_comp, u1c, u2c = _comp_props_and_ldc(M_comp)
-        M_eb = q*M_comp
-        R_eb, _ = stellar_relations(np.array([M_eb]), np.array([R_comp]), np.array([Teff]))
-        R_eb = float(R_eb[0])
-        fr_eb = float(
-            flux_relation(np.array([M_eb]))
-            / (flux_relation(np.array([M_eb])) + flux_relation(np.array([M_s])))
-        )
-        fr_host = float(
-            flux_relation(np.array([M_comp]))
-            / (flux_relation(np.array([M_comp])) + flux_relation(np.array([M_s])))
-        )
-        a = ((G*(M_comp+M_eb)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (R_eb*Rsun + R_comp*Rsun)/a * e_corr
-        if Ptra > 1.0:
-            return -np.inf
-        # twin collision criterion
-        if (2*R_comp*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_twin_fourier(
-            time, flux_ft, var_ft, R_eb, fr_eb, P, inc, a, R_comp, u1c, u2c,
-            ecc, argp_, companion_fluxratio=fr_host, companion_is_host=True,
-            exptime=exptime, nsamples=nsamples
-        )
-        lnL += companion_lnprior(M_comp, M_eb)
-        return float(lnL)
 
     # Run nested sampling for both branches
+    _ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS"
+        else (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
+    )
+    _host = _BoundCompanionHost.from_prepared(
+        _Star(M_s, R_s, Teff, None, None),
+        Z,
+        _ldc,
+        plx,
+        separations,
+        contrasts,
+        None if contrast_curve_file is None else filt,
+        molusc_qs,
+        ldc_rule="rounded_13000",
+    )
+    _model_loglike_single = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=None),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=1.0,
+            doubled_host_collision=False,
+            q_branch="single",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_single = _ScenarioPrior(_model_loglike_single, _inv_sample_ecc)
+    loglike_single = _ScenarioLikelihood(
+        model=_model_loglike_single,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+        cost_options=dict(sigma_veto=sigma),
+    )
+    _model_loglike_twin = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=None),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=2.0,
+            doubled_host_collision=True,
+            q_branch="twin",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_twin = _ScenarioPrior(_model_loglike_twin, _inv_sample_ecc)
+    loglike_twin = _ScenarioLikelihood(
+        model=_model_loglike_twin,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_twin_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+    )
+
     lnZ_single, res_s = _run_persistent_evidence(
         loglike_single, prior_transform_single, ndim=6,
         n_active=N, target_ess=2 * N, mcmc_steps=steps
@@ -1461,10 +1092,10 @@ def lnZ_DTP_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
             mission: str = "TESS", flatpriors: bool = False,
             exptime: float = 0.00139, nsamples: int = 20):
     """
-    Calculates the marginal likelihood of the DTP scenario using dynesty.
+    Calculates the marginal likelihood of the DTP scenario using persistent sampling.
     Background host selection is modeled through TRILEGAL-based priors and
     optional contrast-curve constraints, which are added to the log-likelihood
-    as lnprior terms. Evidence lnZ is estimated via nested sampling.
+    as lnprior terms. Evidence lnZ is estimated via persistent sampling.
     Args:
         time (numpy array): Time of each data point
                             [days from transit midpoint].
@@ -1483,7 +1114,7 @@ def lnZ_DTP_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         contrast_curve_file (string): Contrast curve file.
         filt (string): Photometric filter of contrast curve. Options
                          are TESS, Vis, J, H, and K.
-        N (int): Number of particles.
+        N (int): Number of active particles.
         steps (int): Number of steps for MCMC.
         mission (str): TESS, Kepler, or K2.
         flatpriors (bool): Assume flat Rp and Porb planet priors?
@@ -1543,61 +1174,51 @@ def lnZ_DTP_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
     # prior transform [uP, uinc, uecc, uargp, urp, uidx]
     flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
 
-    def prior_transform(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, urp, uidx = u
-        P = P_orb_range[0] + uP*(P_orb_range[1]-P_orb_range[0]) if P_orb_range[0] != P_orb_range[1] else P_orb_range[0]
-        inc = float(sample_inc(np.array([uinc]))[0])
-        ecc = _inv_sample_ecc(float(uecc), planet=True, P_orb=P)
-        argp_ = float(sample_w(np.array([uargp]))[0])
-        rp = float(sample_rp(np.array([urp]), np.array([M_s]), flatpriors)[0])
-        idx = int(np.floor(np.clip(uidx, 1e-12, 1-1e-12) * N_comp))
-        idx = min(idx, N_comp-1)
-        return np.array([P, inc, ecc, argp_, rp, float(idx)])
 
     # delta mag per filter function
-    def _delta_mag_for_idx(idx: int) -> float:
-        if filt == "J":
-            return float(delta_J[idx])
-        elif filt == "H":
-            return float(delta_H[idx])
-        elif filt == "K":
-            return float(delta_K[idx])
-        else:
-            return float(delta_T[idx])
 
-    def lnprior_background_idx(idx: int) -> float:
-        dm = _delta_mag_for_idx(idx)
-        if dm > 0.0:
-            return -np.inf
-        if separations is None:
-            # approximate prior used previously
-            lnpr = np.log10((N_comp/0.1) * (1/3600)**2 * 2.2**2)
-            return float(0.0 if lnpr > 0.0 else lnpr)
-        else:
-            lnpr = float(lnprior_background(N_comp, np.array([abs(dm)]), separations, contrasts)[0])
-            return float(0.0 if lnpr > 0.0 else lnpr)
-
-    def loglike(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, rp, idx_f = theta
-        idx = int(idx_f)
-        a = ((G*M_s*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (rp*Rearth + R_s*Rsun)/a * e_corr
-        if Ptra > 1.0:
-            return -np.inf
-        if (rp*Rearth + R_s*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        fr_bg = float(fluxratios_comp_T[idx])
-        lnL = norm_const - lnL_TP_fourier(
-            time, flux_ft, var_ft, rp, P, inc, a, R_s, u1, u2,
-            ecc, argp_, companion_fluxratio=fr_bg, companion_is_host=False,
-            exptime=exptime, nsamples=nsamples
-        )
-        lnL += lnprior_background_idx(idx)
-        return float(lnL)
+    _ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS"
+        else (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
+    )
+    _host = _BackgroundHost.prepare(
+        _Star(M_s, R_s, Teff, u1, u2),
+        masses_comp,
+        loggs_comp,
+        Teffs_comp,
+        Zs_comp,
+        (delta_T, delta_J, delta_H, delta_K),
+        _ldc,
+        separations,
+        contrasts,
+        filt,
+        companion_is_host=False,
+        integer_teff=False,
+    )
+    _model_loglike = _Scenario(
+        _host,
+        _Planet(flatpriors, radius_prior_on_target=False),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=1.0,
+            doubled_host_collision=False,
+            q_branch="all",
+            observation_kind="standard",
+        ),
+    )
+    prior_transform = _ScenarioPrior(_model_loglike, _inv_sample_ecc)
+    loglike = _ScenarioLikelihood(
+        model=_model_loglike,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_TP_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+    )
 
     lnZ, results = _run_persistent_evidence(
         loglike, prior_transform, ndim=6,
@@ -1673,7 +1294,7 @@ def lnZ_DEB_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         contrast_curve_file (string): Path to contrast curve file.
         filt (string): Photometric filter of contrast curve. Options
                          are TESS, Vis, J, H, and K.
-        N (int): Number of particles.
+        N (int): Number of active particles.
         steps (int): Number of steps for MCMC.
         mission (str): TESS, Kepler, or K2.
         flatpriors (bool): Assume flat Rp and Porb planet priors?
@@ -1718,97 +1339,77 @@ def lnZ_DEB_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         separations, contrasts = None, None
 
     # helpers
-    def _delta_mag_for_idx(idx: int) -> float:
-        if filt == "J":
-            return float(delta_J[idx])
-        elif filt == "H":
-            return float(delta_H[idx])
-        elif filt == "K":
-            return float(delta_K[idx])
-        else:
-            return float(delta_T[idx])
 
-    def lnprior_background_idx(idx: int) -> float:
-        dm = _delta_mag_for_idx(idx)
-        if dm > 0.0:
-            return -np.inf
-        if separations is None:
-            lnpr = np.log10((N_comp/0.1) * (1/3600)**2 * 2.2**2)
-            return float(0.0 if lnpr > 0.0 else lnpr)
-        lnpr = float(lnprior_background(N_comp, np.array([abs(dm)]), separations, contrasts)[0])
-        return float(0.0 if lnpr > 0.0 else lnpr)
 
     # theta = [uP, uinc, uecc, uargp, uq, uidx]
     flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
 
-    def prior_transform_single(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, uq, uidx = u
-        P = P_orb_range[0] + uP*(P_orb_range[1]-P_orb_range[0]) if P_orb_range[0] != P_orb_range[1] else P_orb_range[0]
-        inc = float(sample_inc(np.array([uinc]))[0])
-        ecc = _inv_sample_ecc(float(uecc), planet=False, P_orb=P)
-        argp_ = float(sample_w(np.array([uargp]))[0])
-        q = float(sample_q(np.array([uq]), M_s)[0])
-        idx = int(np.floor(np.clip(uidx, 1e-12, 1-1e-12) * N_comp))
-        idx = min(idx, N_comp-1)
-        return np.array([P, inc, ecc, argp_, q, float(idx)])
-
-    def loglike_single(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q, idxf = theta
-        if q >= 0.95:
-            return -np.inf
-        idx = int(idxf)
-        M2 = q*M_s
-        R2, _ = stellar_relations(np.array([M2]), np.array([R_s]), np.array([Teff]))
-        R2 = float(R2[0])
-        fr_eb = float(flux_relation(np.array([M2]))/(flux_relation(np.array([M2]))+flux_relation(np.array([M_s]))))
-        fr_bg = float(fluxratios_comp_T[idx])
-        a = ((G*(M_s+M2)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (R2*Rsun + R_s*Rsun)/a * e_corr
-        if Ptra > 1.0 or (R2*Rsun + R_s*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_fourier(
-            time, flux_ft, var_ft, sigma, R2, fr_eb, P, inc, a, R_s, u1, u2,
-            ecc, argp_, companion_fluxratio=fr_bg, companion_is_host=False,
-            exptime=exptime, nsamples=nsamples
-        )
-        lnL += lnprior_background_idx(idx)
-        return float(lnL)
-
-    def prior_transform_twin(u: np.ndarray) -> np.ndarray:
-        vals = prior_transform_single(u)
-        vals[0] = 2.0*vals[0]
-        return vals
-
-    def loglike_twin(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q, idxf = theta
-        if q < 0.95:
-            return -np.inf
-        idx = int(idxf)
-        M2 = q*M_s
-        R2, _ = stellar_relations(np.array([M2]), np.array([R_s]), np.array([Teff]))
-        R2 = float(R2[0])
-        fr_eb = float(flux_relation(np.array([M2]))/(flux_relation(np.array([M2]))+flux_relation(np.array([M_s]))))
-        fr_bg = float(fluxratios_comp_T[idx])
-        a = ((G*(M_s+M2)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (R2*Rsun + R_s*Rsun)/a * e_corr
-        # twin collision criterion uses 2*R_s
-        if Ptra > 1.0 or (2*R_s*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_twin_fourier(
-            time, flux_ft, var_ft, R2, fr_eb, P, inc, a, R_s, u1, u2,
-            ecc, argp_, companion_fluxratio=fr_bg, companion_is_host=False,
-            exptime=exptime, nsamples=nsamples
-        )
-        lnL += lnprior_background_idx(idx)
-        return float(lnL)
+    _ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS"
+        else (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
+    )
+    _host = _BackgroundHost.prepare(
+        _Star(M_s, R_s, Teff, u1, u2),
+        masses_comp,
+        loggs_comp,
+        Teffs_comp,
+        Zs_comp,
+        (delta_T, delta_J, delta_H, delta_K),
+        _ldc,
+        separations,
+        contrasts,
+        filt,
+        companion_is_host=False,
+        integer_teff=False,
+    )
+    _model_loglike_single = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=None),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=1.0,
+            doubled_host_collision=False,
+            q_branch="single",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_single = _ScenarioPrior(_model_loglike_single, _inv_sample_ecc)
+    loglike_single = _ScenarioLikelihood(
+        model=_model_loglike_single,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+        cost_options=dict(sigma_veto=sigma),
+    )
+    _model_loglike_twin = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=None),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=2.0,
+            doubled_host_collision=True,
+            q_branch="twin",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_twin = _ScenarioPrior(_model_loglike_twin, _inv_sample_ecc)
+    loglike_twin = _ScenarioLikelihood(
+        model=_model_loglike_twin,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_twin_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+    )
 
     lnZ_single, res_s = _run_persistent_evidence(
         loglike_single, prior_transform_single, ndim=6,
@@ -1915,25 +1516,7 @@ def lnZ_BTP_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         ldc_Zs = ldc_K_Zs; ldc_Teffs = ldc_K_Teffs; ldc_loggs = ldc_K_loggs; ldc_u1s = ldc_K_u1s; ldc_u2s = ldc_K_u2s
 
     # helpers
-    def _delta_mag_for_idx(idx: int) -> float:
-        if filt == "J":
-            return float(delta_J[idx])
-        elif filt == "H":
-            return float(delta_H[idx])
-        elif filt == "K":
-            return float(delta_K[idx])
-        else:
-            return float(delta_T[idx])
 
-    def lnprior_background_idx(idx: int) -> float:
-        dm = _delta_mag_for_idx(idx)
-        if dm > 0.0:
-            return -np.inf
-        if separations is None:
-            lnpr = np.log10((N_comp/0.1) * (1/3600)**2 * 2.2**2)
-            return float(0.0 if lnpr > 0.0 else lnpr)
-        lnpr = float(lnprior_background(N_comp, np.array([abs(dm)]), separations, contrasts)[0])
-        return float(0.0 if lnpr > 0.0 else lnpr)
 
     def _bg_props_and_ldc(idx: int) -> tuple:
         # radius from mass and logg; LDC from grids at (Z, Teff, logg)
@@ -1955,37 +1538,48 @@ def lnZ_BTP_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
     # theta = [uP, uinc, uecc, uargp, urp, uidx]
     flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
 
-    def prior_transform(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, urp, uidx = u
-        P = P_orb_range[0] + uP*(P_orb_range[1]-P_orb_range[0]) if P_orb_range[0] != P_orb_range[1] else P_orb_range[0]
-        inc = float(sample_inc(np.array([uinc]))[0])
-        ecc = _inv_sample_ecc(float(uecc), planet=True, P_orb=P)
-        argp_ = float(sample_w(np.array([uargp]))[0])
-        rp = float(sample_rp(np.array([urp]), np.array([M_s]), flatpriors)[0])
-        idx = int(np.floor(np.clip(uidx, 1e-12, 1-1e-12) * N_comp))
-        idx = min(idx, N_comp-1)
-        return np.array([P, inc, ecc, argp_, rp, float(idx)])
-
-    def loglike(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, rp, idxf = theta
-        idx = int(idxf)
-        Mbg, Rbg, u1b, u2b = _bg_props_and_ldc(idx)
-        a = ((G*Mbg*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (rp*Rearth + Rbg*Rsun)/a * e_corr
-        if Ptra > 1.0 or (rp*Rearth + Rbg*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        fr_host = float(fluxratios_comp_T[idx])  # background star flux fraction
-        lnL = norm_const - lnL_TP_fourier(
-            time, flux_ft, var_ft, rp, P, inc, a, Rbg, u1b, u2b,
-            ecc, argp_, companion_fluxratio=fr_host, companion_is_host=True,
-            exptime=exptime, nsamples=nsamples
-        )
-        lnL += lnprior_background_idx(idx)
-        return float(lnL)
+    _ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS"
+        else (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
+    )
+    _host = _BackgroundHost.prepare(
+        _Star(M_s, R_s, Teff, None, None),
+        masses_comp,
+        loggs_comp,
+        Teffs_comp,
+        Zs_comp,
+        (delta_T, delta_J, delta_H, delta_K),
+        _ldc,
+        separations,
+        contrasts,
+        filt,
+        companion_is_host=True,
+        integer_teff=True,
+    )
+    _model_loglike = _Scenario(
+        _host,
+        _Planet(flatpriors, radius_prior_on_target=True),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=1.0,
+            doubled_host_collision=False,
+            q_branch="all",
+            observation_kind="standard",
+        ),
+    )
+    prior_transform = _ScenarioPrior(_model_loglike, _inv_sample_ecc)
+    loglike = _ScenarioLikelihood(
+        model=_model_loglike,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_TP_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+    )
 
     lnZ, results = _run_persistent_evidence(
         loglike, prior_transform, ndim=6,
@@ -2079,15 +1673,6 @@ def lnZ_BEB_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         separations, contrasts = None, None
 
     # helpers
-    def _delta_mag_primary_idx(idx: int) -> float:
-        if filt == "J":
-            return float(delta_J[idx])
-        elif filt == "H":
-            return float(delta_H[idx])
-        elif filt == "K":
-            return float(delta_K[idx])
-        else:
-            return float(delta_T[idx])
 
     def _ldc_for_bg(logg_bg: float, Teff_bg: float, Z_bg: float) -> tuple:
         if mission == "TESS":
@@ -2104,120 +1689,76 @@ def lnZ_BEB_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         u2b = float(ldc_u2s[mask]) if np.any(mask) else float(ldc_u2s[(ldc_Zs == this_Z)][0])
         return u1b, u2b
 
-    def lnprior_background_combined(idx: int, Mbg: float, M2: float) -> float:
-        dm_p = _delta_mag_primary_idx(idx)
-        if dm_p > 0.0:
-            return -np.inf
-        if separations is None:
-            lnpr = np.log10((N_comp/0.1) * (1/3600)**2 * 2.2**2)
-            return float(0.0 if lnpr > 0.0 else lnpr)
-        # compute combined delta mag in chosen filter
-        if filt == "J":
-            fr_p_cc = 10**(delta_J[idx]/2.5)/(1+10**(delta_J[idx]/2.5))
-        elif filt == "H":
-            fr_p_cc = 10**(delta_H[idx]/2.5)/(1+10**(delta_H[idx]/2.5))
-        elif filt == "K":
-            fr_p_cc = 10**(delta_K[idx]/2.5)/(1+10**(delta_K[idx]/2.5))
-        else:
-            fr_p_cc = 10**(delta_T[idx]/2.5)/(1+10**(delta_T[idx]/2.5))
-        fr_p_bound_cc = float(flux_relation(np.array([Mbg]), filt)/(flux_relation(np.array([Mbg]), filt)+flux_relation(np.array([M_s]), filt)))
-        fr_eb_bound_cc = float(flux_relation(np.array([M2]), filt)/(flux_relation(np.array([M2]), filt)+flux_relation(np.array([M_s]), filt)))
-        distance_correction_cc = fr_p_cc / fr_p_bound_cc if fr_p_bound_cc > 0 else 0.0
-        fr_eb_cc = fr_eb_bound_cc * distance_correction_cc
-        combined = (fr_p_cc/(1-fr_p_cc)) + (fr_eb_cc/(1-fr_eb_cc))
-        delta_mag_comb = 2.5*np.log10(combined)
-        lnpr = float(lnprior_background(N_comp, np.array([abs(delta_mag_comb)]), separations, contrasts)[0])
-        return float(0.0 if lnpr > 0.0 else lnpr)
 
     # theta = [uP, uinc, uecc, uargp, uq, uidx]
     flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
 
-    def prior_transform_single(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, uq, uidx = u
-        P = P_orb_range[0] + uP*(P_orb_range[1]-P_orb_range[0]) if P_orb_range[0] != P_orb_range[1] else P_orb_range[0]
-        inc = float(sample_inc(np.array([uinc]))[0])
-        ecc = _inv_sample_ecc(float(uecc), planet=False, P_orb=P)
-        argp_ = float(sample_w(np.array([uargp]))[0])
-        q = float(sample_q(np.array([uq]), M_s)[0])
-        idx = int(np.floor(np.clip(uidx, 1e-12, 1-1e-12) * N_comp))
-        idx = min(idx, N_comp-1)
-        return np.array([P, inc, ecc, argp_, q, float(idx)])
-
-    def loglike_single(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q, idxf = theta
-        if q >= 0.95:
-            return -np.inf
-        idx = int(idxf)
-        Mbg = float(masses_comp[idx])
-        logg_bg = float(loggs_comp[idx])
-        Rbg = float(np.sqrt(G*Mbg*Msun / (10**logg_bg)) / Rsun)
-        Teff_bg = float(Teffs_comp[idx])
-        Z_bg = float(Zs_comp[idx]) if Zs_comp is not None else 0.0
-        u1b, u2b = _ldc_for_bg(logg_bg, Teff_bg, Z_bg)
-        M2 = q*Mbg
-        R2, _ = stellar_relations(np.array([M2]), np.array([Rbg]), np.array([Teff_bg]))
-        R2 = float(R2[0])
-        # flux ratios in TESS band, distance-corrected for EB companion
-        fr_p_bound = float(flux_relation(np.array([Mbg]))/(flux_relation(np.array([Mbg]))+flux_relation(np.array([M_s]))))
-        fr_p_obs = float(fr_primary_T[idx])
-        fr_eb_bound = float(flux_relation(np.array([M2]))/(flux_relation(np.array([M2]))+flux_relation(np.array([M_s]))))
-        distance_correction = (fr_p_obs / fr_p_bound) if fr_p_bound > 0 else 0.0
-        fr_eb_obs = fr_eb_bound * distance_correction
-        a = ((G*(Mbg+M2)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (R2*Rsun + Rbg*Rsun)/a * e_corr
-        if Ptra > 1.0 or (R2*Rsun + Rbg*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_fourier(
-            time, flux_ft, var_ft, sigma, R2, fr_eb_obs, P, inc, a, Rbg, u1b, u2b,
-            ecc, argp_, companion_fluxratio=fr_p_obs, companion_is_host=True,
-            exptime=exptime, nsamples=nsamples
-        )
-        lnL += lnprior_background_combined(idx, Mbg, M2)
-        return float(lnL)
-
-    def prior_transform_twin(u: np.ndarray) -> np.ndarray:
-        vals = prior_transform_single(u)
-        vals[0] = 2.0*vals[0]
-        return vals
-
-    def loglike_twin(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q, idxf = theta
-        if q < 0.95:
-            return -np.inf
-        idx = int(idxf)
-        Mbg = float(masses_comp[idx])
-        logg_bg = float(loggs_comp[idx])
-        Rbg = float(np.sqrt(G*Mbg*Msun / (10**logg_bg)) / Rsun)
-        Teff_bg = float(Teffs_comp[idx])
-        Z_bg = float(Zs_comp[idx]) if Zs_comp is not None else 0.0
-        u1b, u2b = _ldc_for_bg(logg_bg, Teff_bg, Z_bg)
-        M2 = q*Mbg
-        R2, _ = stellar_relations(np.array([M2]), np.array([Rbg]), np.array([Teff_bg]))
-        R2 = float(R2[0])
-        fr_p_bound = float(flux_relation(np.array([Mbg]))/(flux_relation(np.array([Mbg]))+flux_relation(np.array([M_s]))))
-        fr_p_obs = float(fr_primary_T[idx])
-        fr_eb_bound = float(flux_relation(np.array([M2]))/(flux_relation(np.array([M2]))+flux_relation(np.array([M_s]))))
-        distance_correction = (fr_p_obs / fr_p_bound) if fr_p_bound > 0 else 0.0
-        fr_eb_obs = fr_eb_bound * distance_correction
-        a = ((G*(Mbg+M2)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (R2*Rsun + Rbg*Rsun)/a * e_corr
-        if Ptra > 1.0 or (2*Rbg*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_twin_fourier(
-            time, flux_ft, var_ft, R2, fr_eb_obs, P, inc, a, Rbg, u1b, u2b,
-            ecc, argp_, companion_fluxratio=fr_p_obs, companion_is_host=True,
-            exptime=exptime, nsamples=nsamples
-        )
-        lnL += lnprior_background_combined(idx, Mbg, M2)
-        return float(lnL)
+    _ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS"
+        else (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
+    )
+    _host = _BackgroundHost.prepare(
+        _Star(M_s, R_s, Teff, None, None),
+        masses_comp,
+        loggs_comp,
+        Teffs_comp,
+        Zs_comp,
+        (delta_T, delta_J, delta_H, delta_K),
+        _ldc,
+        separations,
+        contrasts,
+        filt,
+        companion_is_host=True,
+        integer_teff=False,
+    )
+    _model_loglike_single = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=None),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=1.0,
+            doubled_host_collision=False,
+            q_branch="single",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_single = _ScenarioPrior(_model_loglike_single, _inv_sample_ecc)
+    loglike_single = _ScenarioLikelihood(
+        model=_model_loglike_single,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+        cost_options=dict(sigma_veto=sigma),
+    )
+    _model_loglike_twin = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=None),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=2.0,
+            doubled_host_collision=True,
+            q_branch="twin",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_twin = _ScenarioPrior(_model_loglike_twin, _inv_sample_ecc)
+    loglike_twin = _ScenarioLikelihood(
+        model=_model_loglike_twin,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_twin_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+    )
 
     lnZ_single, res_s = _run_persistent_evidence(
         loglike_single, prior_transform_single, ndim=6,
@@ -2297,7 +1838,7 @@ def lnZ_NTP_unknown_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
                     exptime: float = 0.00139, nsamples: int = 20):
     """
     Calculates the marginal likelihood of the NTP scenario for
-    a star of unknown properties using dynesty.
+    a star of unknown properties using persistent sampling.
     Returns: res (dict)
     """
     # Period handling
@@ -2345,43 +1886,35 @@ def lnZ_NTP_unknown_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
     # theta = [uP, uinc, uecc, uargp, urp, uidx]
     flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
 
-    def prior_transform(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, urp, uidx = u
-        # choose star index
-        idx = int(np.floor(np.clip(uidx, 1e-12, 1-1e-12) * N_possible))
-        idx = min(idx, N_possible-1)
-        Mstar = float(masses_possible[idx])
-        P = P_orb_range[0] + uP*(P_orb_range[1]-P_orb_range[0]) if P_orb_range[0] != P_orb_range[1] else P_orb_range[0]
-        inc = float(sample_inc(np.array([uinc]))[0])
-        ecc = _inv_sample_ecc(float(uecc), planet=True, P_orb=P)
-        argp_ = float(sample_w(np.array([uargp]))[0])
-        rp = float(sample_rp(np.array([urp]), np.array([Mstar]), flatpriors)[0])
-        return np.array([P, inc, ecc, argp_, rp, float(idx)])
-
-    def loglike(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, rp, idxf = theta
-        idx = int(idxf)
-        Mstar = float(masses_possible[idx])
-        Rstar = float(radii_possible[idx])
-        logg_s = float(loggs_possible[idx])
-        Teff_s = float(Teffs_possible[idx])
-        Z_s = float(Zs_possible[idx]) if Zs_possible is not None else 0.0
-        if not (logg_s >= 3.5 and Teff_s <= 10000):
-            return -np.inf
-        u1, u2 = _ldc_for_star(logg_s, Teff_s, Z_s)
-        a = ((G*Mstar*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (rp*Rearth + Rstar*Rsun)/a * e_corr
-        if Ptra > 1.0 or (rp*Rearth + Rstar*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_TP_fourier(
-            time, flux_ft, var_ft, rp, P, inc, a, Rstar, u1, u2,
-            ecc, argp_, exptime=exptime, nsamples=nsamples
-        )
-        return float(lnL)
+    _ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS"
+        else (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
+    )
+    _host = _UnknownHost.prepare(masses_possible, loggs_possible, Teffs_possible, Zs_possible, _ldc)
+    _model_loglike = _Scenario(
+        _host,
+        _Planet(flatpriors, radius_prior_on_target=False),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=1.0,
+            doubled_host_collision=False,
+            q_branch="all",
+            observation_kind="standard",
+        ),
+    )
+    prior_transform = _ScenarioPrior(_model_loglike, _inv_sample_ecc)
+    loglike = _ScenarioLikelihood(
+        model=_model_loglike,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_TP_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+    )
 
     lnZ, res_obj = _run_persistent_evidence(
         loglike, prior_transform, ndim=6,
@@ -2451,7 +1984,7 @@ def lnZ_NEB_unknown_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         P_orb (float): Orbital period [days].
         Tmag (float): Target star TESS magnitude.
         trilegal_fname (string): File containing trilegal query results.
-        N (int): Number of particles.
+        N (int): Number of active particles.
         steps (int): Number of MCMC steps.
         mission (str): TESS, Kepler, or K2.
         flatpriors (bool): Assume flat Rp and Porb planet priors?
@@ -2503,86 +2036,59 @@ def lnZ_NEB_unknown_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
     # theta = [uP, uinc, uecc, uargp, uq, uidx]
     flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
 
-    def prior_transform_single(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, uq, uidx = u
-        idx = int(np.floor(np.clip(uidx, 1e-12, 1-1e-12) * N_possible))
-        idx = min(idx, N_possible-1)
-        P = P_orb_range[0] + uP*(P_orb_range[1]-P_orb_range[0]) if P_orb_range[0] != P_orb_range[1] else P_orb_range[0]
-        inc = float(sample_inc(np.array([uinc]))[0])
-        ecc = _inv_sample_ecc(float(uecc), planet=False, P_orb=P)
-        argp_ = float(sample_w(np.array([uargp]))[0])
-        q = float(sample_q(np.array([uq]), 1.0)[0])
-        return np.array([P, inc, ecc, argp_, q, float(idx)])
-
-    def loglike_single(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q, idxf = theta
-        if q >= 0.95:
-            return -np.inf
-        idx = int(idxf)
-        M1 = float(masses_possible[idx])
-        R1 = float(radii_possible[idx])
-        logg_s = float(loggs_possible[idx])
-        Teff_s = float(Teffs_possible[idx])
-        Z_s = float(Zs_possible[idx]) if Zs_possible is not None else 0.0
-        if not (logg_s >= 3.5 and Teff_s <= 10000):
-            return -np.inf
-        u1, u2 = _ldc_for_star(logg_s, Teff_s, Z_s)
-        M2 = q*M1
-        R2, _ = stellar_relations(np.array([M2]), np.array([R1]), np.array([Teff_s]))
-        R2 = float(R2[0])
-        # EB flux ratio in same system (no third light)
-        fr_eb = float(flux_relation(np.array([M2]))/(flux_relation(np.array([M2]))+flux_relation(np.array([M1]))))
-        a = ((G*(M1+M2)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (R2*Rsun + R1*Rsun)/a * e_corr
-        if Ptra > 1.0 or (R2*Rsun + R1*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_fourier(
-            time, flux_ft, var_ft, sigma, R2, fr_eb, P, inc, a, R1, u1, u2,
-            ecc, argp_, companion_fluxratio=0.0, companion_is_host=False,
-            exptime=exptime, nsamples=nsamples
-        )
-        return float(lnL)
-
-    def prior_transform_twin(u: np.ndarray) -> np.ndarray:
-        vals = prior_transform_single(u)
-        vals[0] = 2.0*vals[0]
-        return vals
-
-    def loglike_twin(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q, idxf = theta
-        if q < 0.95:
-            return -np.inf
-        idx = int(idxf)
-        M1 = float(masses_possible[idx])
-        R1 = float(radii_possible[idx])
-        logg_s = float(loggs_possible[idx])
-        Teff_s = float(Teffs_possible[idx])
-        Z_s = float(Zs_possible[idx]) if Zs_possible is not None else 0.0
-        if not (logg_s >= 3.5 and Teff_s <= 10000):
-            return -np.inf
-        u1, u2 = _ldc_for_star(logg_s, Teff_s, Z_s)
-        M2 = q*M1
-        R2, _ = stellar_relations(np.array([M2]), np.array([R1]), np.array([Teff_s]))
-        R2 = float(R2[0])
-        fr_eb = float(flux_relation(np.array([M2]))/(flux_relation(np.array([M2]))+flux_relation(np.array([M1]))))
-        a = ((G*(M1+M2)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (R2*Rsun + R1*Rsun)/a * e_corr
-        if Ptra > 1.0 or (2*R1*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_twin_fourier(
-            time, flux_ft, var_ft, R2, fr_eb, P, inc, a, R1, u1, u2,
-            ecc, argp_, companion_fluxratio=0.0, companion_is_host=False,
-            exptime=exptime, nsamples=nsamples
-        )
-        return float(lnL)
+    _ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS"
+        else (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
+    )
+    _host = _UnknownHost.prepare(masses_possible, loggs_possible, Teffs_possible, Zs_possible, _ldc)
+    _model_loglike_single = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=1.0),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=1.0,
+            doubled_host_collision=False,
+            q_branch="single",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_single = _ScenarioPrior(_model_loglike_single, _inv_sample_ecc)
+    loglike_single = _ScenarioLikelihood(
+        model=_model_loglike_single,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+        cost_options=dict(sigma_veto=sigma),
+    )
+    _model_loglike_twin = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=1.0),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=2.0,
+            doubled_host_collision=True,
+            q_branch="twin",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_twin = _ScenarioPrior(_model_loglike_twin, _inv_sample_ecc)
+    loglike_twin = _ScenarioLikelihood(
+        model=_model_loglike_twin,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_twin_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+    )
 
     lnZ_s, res_s = _run_persistent_evidence(
         loglike_single, prior_transform_single, ndim=6,
@@ -2643,7 +2149,7 @@ def lnZ_NTP_evolved_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
                     exptime: float = 0.00139, nsamples: int = 20):
     """
     Calculates the marginal likelihood of the NTP scenario for evolved
-    (subgiant) hosts using dynesty. Assumes logg~3 to infer M_s from R_s,
+    (subgiant) hosts using persistent sampling. Assumes logg~3 to infer M_s from R_s,
     then follows the same prior/likelihood structure as lnZ_TTP.
     Args:
         time (numpy array): Time of each data point
@@ -2654,7 +2160,7 @@ def lnZ_NTP_evolved_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         R_s (float): Target star radius [Solar radii].
         Teff (float): Target star effective temperature [K].
         Z (float): Target star metallicity [dex].
-        N (int): Number of particles.
+        N (int): Number of active particles.
         steps (int): Number of MCMC steps.
         mission (str): TESS, Kepler, or K2.
         flatpriors (bool): Assume flat Rp and Porb planet priors?
@@ -2686,30 +2192,35 @@ def lnZ_NTP_evolved_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
     # theta = [uP, uinc, uecc, uargp, urp]
     flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
 
-    def prior_transform(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, urp = u
-        P = P_orb_range[0] + uP*(P_orb_range[1]-P_orb_range[0]) if P_orb_range[0] != P_orb_range[1] else P_orb_range[0]
-        inc = float(sample_inc(np.array([uinc]))[0])
-        ecc = _inv_sample_ecc(float(uecc), planet=True, P_orb=P)
-        argp_ = float(sample_w(np.array([uargp]))[0])
-        rp = float(sample_rp(np.array([urp]), np.array([M_s]), flatpriors)[0])
-        return np.array([P, inc, ecc, argp_, rp])
-
-    def loglike(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, rp = theta
-        a = ((G*M_s*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (rp*Rearth + R_s*Rsun)/a * e_corr
-        if Ptra > 1.0 or (rp*Rearth + R_s*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_TP_fourier(
-            time, flux_ft, var_ft, rp, P, inc, a, R_s, u1, u2,
-            ecc, argp_, exptime=exptime, nsamples=nsamples
-        )
-        return float(lnL)
+    _ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS"
+        else (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
+    )
+    _host = _KnownHost(_Star(M_s, R_s, Teff, u1, u2))
+    _model_loglike = _Scenario(
+        _host,
+        _Planet(flatpriors, radius_prior_on_target=False),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=1.0,
+            doubled_host_collision=False,
+            q_branch="all",
+            observation_kind="standard",
+        ),
+    )
+    prior_transform = _ScenarioPrior(_model_loglike, _inv_sample_ecc)
+    loglike = _ScenarioLikelihood(
+        model=_model_loglike,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_TP_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+    )
 
     lnZ, res_obj = _run_persistent_evidence(
         loglike, prior_transform, ndim=5,
@@ -2765,7 +2276,7 @@ def lnZ_NEB_evolved_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
         R_s (float): Target star radius [Solar radii].
         Teff (float): Target star effective temperature [K].
         Z (float): Target star metallicity [dex].
-        N (int): Number of particles.
+        N (int): Number of active particles.
         steps (int): Number of MCMC steps.
         mission (str): TESS, Kepler, or K2.
         flatpriors (bool): Assume flat Rp and Porb planet priors?
@@ -2798,67 +2309,62 @@ def lnZ_NEB_evolved_fourier(time: np.ndarray, flux: np.ndarray, sigma: float,
     # theta = [uP, uinc, uecc, uargp, uq]
     flux_ft, var_ft, norm_const = _build_fourier_data(flux, var_fourier)
 
-    def prior_transform_single(u: np.ndarray) -> np.ndarray:
-        uP, uinc, uecc, uargp, uq = u
-        P = P_orb_range[0] + uP*(P_orb_range[1]-P_orb_range[0]) if P_orb_range[0] != P_orb_range[1] else P_orb_range[0]
-        inc = float(sample_inc(np.array([uinc]))[0])
-        ecc = _inv_sample_ecc(float(uecc), planet=False, P_orb=P)
-        argp_ = float(sample_w(np.array([uargp]))[0])
-        q = float(sample_q(np.array([uq]), 1.0)[0])
-        return np.array([P, inc, ecc, argp_, q])
-
-    def loglike_single(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q = theta
-        if q >= 0.95:
-            return -np.inf
-        M2 = q*M_s
-        R2, _ = stellar_relations(np.array([M2]), np.array([R_s]), np.array([Teff]))
-        R2 = float(R2[0])
-        fr_eb = float(flux_relation(np.array([M2]))/(flux_relation(np.array([M2]))+flux_relation(np.array([M_s]))))
-        a = ((G*(M_s+M2)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (R2*Rsun + R_s*Rsun)/a * e_corr
-        if Ptra > 1.0 or (R2*Rsun + R_s*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_fourier(
-            time, flux_ft, var_ft, sigma, R2, fr_eb, P, inc, a, R_s, u1, u2,
-            ecc, argp_, companion_fluxratio=0.0, companion_is_host=False,
-            exptime=exptime, nsamples=nsamples
-        )
-        return float(lnL)
-
-    def prior_transform_twin(u: np.ndarray) -> np.ndarray:
-        vals = prior_transform_single(u)
-        vals[0] = 2.0*vals[0]
-        return vals
-
-    def loglike_twin(theta: np.ndarray) -> float:
-        P, inc, ecc, argp_, q = theta
-        if q < 0.95:
-            return -np.inf
-        M2 = q*M_s
-        R2, _ = stellar_relations(np.array([M2]), np.array([R_s]), np.array([Teff]))
-        R2 = float(R2[0])
-        fr_eb = float(flux_relation(np.array([M2]))/(flux_relation(np.array([M2]))+flux_relation(np.array([M_s]))))
-        a = ((G*(M_s+M2)*Msun)/(4*pi**2)*(P*86400)**2)**(1/3)
-        e_corr = (1+ecc*np.sin(argp_*pi/180))/(1-ecc**2)
-        Ptra = (R2*Rsun + R_s*Rsun)/a * e_corr
-        if Ptra > 1.0 or (2*R_s*Rsun) > a*(1-ecc):
-            return -np.inf
-        inc_min = np.degrees(np.arccos(min(1.0, Ptra)))
-        if inc < inc_min:
-            return -np.inf
-        lnL = norm_const - lnL_EB_twin_fourier(
-            time, flux_ft, var_ft, R2, fr_eb, P, inc, a, R_s, u1, u2,
-            ecc, argp_, companion_fluxratio=0.0, companion_is_host=False,
-            exptime=exptime, nsamples=nsamples
-        )
-        return float(lnL)
 
     #lnZ_t, res_t = _run_dynesty_evidence(loglike_twin, prior_transform_twin, ndim=5, nlive=nlive, dlogz=dlogz, dynamic=dynamic)
+    _ldc = (
+        (ldc_T_Zs, ldc_T_Teffs, ldc_T_loggs, ldc_T_u1s, ldc_T_u2s)
+        if mission == "TESS"
+        else (ldc_K_Zs, ldc_K_Teffs, ldc_K_loggs, ldc_K_u1s, ldc_K_u2s)
+    )
+    _host = _KnownHost(_Star(M_s, R_s, Teff, u1, u2))
+    _model_loglike_single = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=1.0),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=1.0,
+            doubled_host_collision=False,
+            q_branch="single",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_single = _ScenarioPrior(_model_loglike_single, _inv_sample_ecc)
+    loglike_single = _ScenarioLikelihood(
+        model=_model_loglike_single,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+        cost_options=dict(sigma_veto=sigma),
+    )
+    _model_loglike_twin = _Scenario(
+        _host,
+        _Binary(mass_ratio_prior_mass=1.0),
+        P_orb_range,
+        _OrbitPolicy(
+            period_factor=2.0,
+            doubled_host_collision=True,
+            q_branch="twin",
+            observation_kind="legacy",
+        ),
+    )
+    prior_transform_twin = _ScenarioPrior(_model_loglike_twin, _inv_sample_ecc)
+    loglike_twin = _ScenarioLikelihood(
+        model=_model_loglike_twin,
+        time=time,
+        data=flux_ft,
+        noise=var_ft,
+        normalization=norm_const,
+        residual_cost=lnL_EB_twin_fourier,
+        exptime=exptime,
+        nsamples=nsamples,
+        domain="fourier",
+    )
+
     lnZ_s, res_s = _run_persistent_evidence(
         loglike_single, prior_transform_single, ndim=5,
         n_active=N, target_ess=2 * N, mcmc_steps=steps

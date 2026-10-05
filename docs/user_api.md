@@ -2,8 +2,8 @@
 
 This is the implementation contract for the next integration milestone, not
 documentation of functions already available. The current package exposes
-`run_evidence`, the recorded compatibility interfaces, and lower-level building
-blocks. Do not add placeholder `preprocess`, `validate`, or `report` functions
+`run_evidence`, the [prepared-input folded HZ interfaces](hz_runs.md),
+the recorded compatibility interfaces, and lower-level building blocks. Do not add placeholder `preprocess`, `validate`, or `report` functions
 that appear to run the corrected pipeline before that integration is complete.
 
 The [download/preparation examples](../examples/README.md) now implement an

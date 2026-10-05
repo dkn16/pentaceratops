@@ -1,0 +1,1135 @@
+{
+  "tess7390": {
+    "scenarios": 21,
+    "native_samples": 49861,
+    "folded_bins": 19813,
+    "replay": [
+      {
+        "scenario": "160075681_NEB",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075681_NEBx2P",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075681_NTP",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_BEB",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_BEBx2P",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_BTP",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_DEB",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_DEBx2P",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_DTP",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_EB",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_EBx2P",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_PEB",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_PEBx2P",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_PTP",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_SEB",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_SEBx2P",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_STP",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075684_TP",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075685_NEB",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075685_NEBx2P",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      },
+      {
+        "scenario": "160075685_NTP",
+        "model_max_error": 0.0,
+        "gain_error": 0.0
+      }
+    ],
+    "FPP": 0.11453120078512388,
+    "FPP_EB": 0.0934019709018591,
+    "NFPP": 0.10566113928564319
+  },
+  "kepler2719": {
+    "scenarios": 18,
+    "events": [
+      1,
+      3,
+      5,
+      8,
+      9,
+      10,
+      11
+    ],
+    "replay": [
+      {
+        "scenario": "137090755_TP",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_EB",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_PTP",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_PEB",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_STP",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_SEB",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_DTP",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_DEB",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_BTP",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_BEB",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_EBx2P",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_PEBx2P",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_SEBx2P",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_DEBx2P",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090755_BEBx2P",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090759_NTP",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090759_NEB",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      },
+      {
+        "scenario": "137090759_NEBx2P",
+        "model_max_error": 0.0,
+        "log_target_error": 0.0
+      }
+    ],
+    "FPP": 0.02963812370424862,
+    "FPP_EB": 0.0025946481136636247,
+    "NFPP": 0.002587224873281026
+  },
+  "real_tess": {
+    "targets": [
+      {
+        "candidate": "TOI-700.02",
+        "FPP": 0.02361335446275498,
+        "FPP_EB": 1.3487887949707663e-05,
+        "NFPP": 1.1921496052080114e-05
+      },
+      {
+        "candidate": "TOI-700.04",
+        "FPP": 0.18407589798350327,
+        "FPP_EB": 0.16441813160464142,
+        "NFPP": 0.16488245753879527
+      },
+      {
+        "candidate": "TOI-715.01",
+        "FPP": 0.009779243761802975,
+        "FPP_EB": 0.00022810540082286978,
+        "NFPP": 0.005022210248296105
+      },
+      {
+        "candidate": "TOI-904.02",
+        "FPP": 0.003147172724736771,
+        "FPP_EB": 7.056131931401513e-07,
+        "NFPP": 2.528340892687459e-09
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "FPP": 0.0023033377855029183,
+        "FPP_EB": 7.118480983396977e-06,
+        "NFPP": 6.352448973561905e-06
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "FPP": 0.6766545509122499,
+        "FPP_EB": 0.11271271694045158,
+        "NFPP": 0.6475663456665572
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "FPP": 0.19980772537694405,
+        "FPP_EB": 0.016941757136751945,
+        "NFPP": 0.18949627844571038
+      }
+    ],
+    "scenarios": 172,
+    "replay": [
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "BEB_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "BEBx2P_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "BTP_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "DEB_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "DEBx2P_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "DTP_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "EB_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "EBx2P_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NEB_150428129",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NEB_150428133",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NEB_150428138",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NEB_736940558",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NEB_736940565",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NEB_736940566",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NEBx2P_150428129",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NEBx2P_150428133",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NEBx2P_150428138",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NEBx2P_736940558",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NEBx2P_736940565",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NEBx2P_736940566",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NTP_150428129",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NTP_150428133",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NTP_150428138",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NTP_736940558",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NTP_736940565",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "NTP_736940566",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "PEB_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "PEBx2P_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "PTP_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "SEB_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "SEBx2P_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "STP_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.02",
+        "scenario": "TP_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "BEB_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "BEBx2P_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "BTP_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "DEB_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "DEBx2P_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "DTP_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "EB_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "EBx2P_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NEB_150428129",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NEB_150428133",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NEB_150428138",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NEB_736940558",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NEB_736940565",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NEB_736940566",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NEBx2P_150428129",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NEBx2P_150428133",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NEBx2P_150428138",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NEBx2P_736940558",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NEBx2P_736940565",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NEBx2P_736940566",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NTP_150428129",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NTP_150428133",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NTP_150428138",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NTP_736940558",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NTP_736940565",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "NTP_736940566",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "PEB_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "PEBx2P_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "PTP_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "SEB_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "SEBx2P_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "STP_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-700.04",
+        "scenario": "TP_150428135",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "BEB_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "BEBx2P_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "BTP_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "DEB_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "DEBx2P_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "DTP_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "EB_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "EBx2P_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "NEB_271971127",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "NEB_271971131",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "NEB_271971140",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "NEB_764727157",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "NEBx2P_271971127",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "NEBx2P_271971131",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "NEBx2P_271971140",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "NEBx2P_764727157",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "NTP_271971127",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "NTP_271971131",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "NTP_271971140",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "NTP_764727157",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "PEB_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "PEBx2P_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "PTP_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "SEB_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "SEBx2P_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "STP_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-715.01",
+        "scenario": "TP_271971130",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "BEB_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "BEBx2P_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "BTP_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "DEB_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "DEBx2P_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "DTP_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "EB_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "EBx2P_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "NEB_261257683",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "NEBx2P_261257683",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "NTP_261257683",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "PEB_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "PEBx2P_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "PTP_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "SEB_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "SEBx2P_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "STP_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-904.02",
+        "scenario": "TP_261257684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "BEB_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "BEBx2P_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "BTP_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "DEB_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "DEBx2P_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "DTP_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "EB_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "EBx2P_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "NEB_198485883",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "NEBx2P_198485883",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "NTP_198485883",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "PEB_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "PEBx2P_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "PTP_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "SEB_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "SEBx2P_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "STP_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-2257.01",
+        "scenario": "TP_198485881",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "BEB_261264800",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "BEBx2P_261264800",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "BTP_261264800",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "DEB_261264800",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "DEBx2P_261264800",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "DTP_261264800",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "EB_261264800",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "EBx2P_261264800",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "NEB_261264794",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "NEB_261264798",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "NEB_261264801",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "NEBx2P_261264794",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "NEBx2P_261264798",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "NEBx2P_261264801",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "NTP_261264794",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "NTP_261264798",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "NTP_261264801",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "PEB_261264800",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "PEBx2P_261264800",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "PTP_261264800",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "STP_261264800",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-6714.01",
+        "scenario": "TP_261264800",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "BEB_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "BEBx2P_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "BTP_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "DEB_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "DEBx2P_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "DTP_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "EB_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "EBx2P_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "NEB_160075681",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "NEB_160075685",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "NEBx2P_160075681",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "NEBx2P_160075685",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "NTP_160075681",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "NTP_160075685",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "PEB_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "PEBx2P_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "PTP_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "SEB_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "SEBx2P_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "STP_160075684",
+        "gain_error": 0.0
+      },
+      {
+        "candidate": "TOI-7390.01",
+        "scenario": "TP_160075684",
+        "gain_error": 0.0
+      }
+    ]
+  },
+  "scope": "Saved best-fit models/log targets and stored evidence normalization; no resampling",
+  "source_sha256": "ebc7b12bd450e99cedb7a001b200033e166a068a187603edf2a836a151d4255d"
+}

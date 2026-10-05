@@ -476,3 +476,13 @@ def calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
     if verbose:
         print(f"  FPP = {df.FPP:.4f}   NFPP = {df.NFPP:.4f}")
     return df
+
+
+def calc_probs_joint_fourier(*args, **kwargs):
+    """Opt-in joint Fourier inference on observed samples, preserving gaps and 2P.
+
+    See :func:`pentaceratops.evidence.joint_fourier.calc_probs_joint_fourier`.
+    The existing half-split calc_probs_fourier entry point is unchanged.
+    """
+    from .evidence.joint_fourier import calc_probs_joint_fourier as joint
+    return joint(*args, **kwargs)

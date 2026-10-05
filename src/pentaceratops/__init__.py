@@ -3,12 +3,23 @@
 Importing the package performs no catalogue queries or downloads.
 """
 
-__version__ = "0.1.0.dev3"
+__version__ = "0.1.0.dev8"
 __all__ = ["Target", "calc_probs_fourier", "run_evidence", "RunResult",
-           "scenario_probabilities", "__version__"]
+           "scenario_probabilities", "calc_probs_folded_real", "calc_probs_folded_fourier",
+           "load_folded_real", "prepare_folded_fourier", "FoldedFourierData",
+           "run_folded_baseline", "__version__"]
 
 
 def __getattr__(name):
+    if name == "run_folded_baseline":
+        from .evidence.folded_baseline import run_folded_baseline
+        return run_folded_baseline
+    if name in ("calc_probs_folded_real", "calc_probs_folded_fourier"):
+        from . import hz
+        return getattr(hz, name)
+    if name in ("load_folded_real", "prepare_folded_fourier", "FoldedFourierData"):
+        from .preprocessing import folded
+        return getattr(folded, name)
     if name == "run_evidence":
         from .api import run_evidence
         return run_evidence

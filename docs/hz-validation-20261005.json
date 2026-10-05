@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-05",
+  "version": "0.1.0.dev7",
+  "source_sha256": "ebc7b12bd450e99cedb7a001b200033e166a068a187603edf2a836a151d4255d",
+  "standalone_wheel": {
+    "file": "dist/pentaceratops-0.1.0.dev7-py3-none-any.whl",
+    "sha256": "ad8b0155f36e8019af88157441cc5dfed1a1b7239d23b0cff50f79297cbc361f",
+    "tests": 612,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 63.543,
+    "warnings": 62979
+  },
+  "replay": {
+    "file": "hz-replay-20261005.json",
+    "real_tess_targets": 7,
+    "real_tess_scenarios": 172,
+    "folded_tess_fourier_scenarios": 21,
+    "folded_kepler_fourier_scenarios": 18,
+    "max_saved_model_error": 0.0,
+    "max_saved_photometric_gain_error": 0.0,
+    "max_kepler_log_target_error": 0.0,
+    "fpp_absolute_tolerance": 2e-12
+  },
+  "scope": "Synthetic/reference regression tests and saved production replay; no production resampling, paper edits, or dependency installation."
+}

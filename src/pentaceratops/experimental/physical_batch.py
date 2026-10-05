@@ -6,6 +6,7 @@ change the scientific model. Discrete background lookups are cached once.
 """
 import inspect
 import numpy as np
+from ..evidence.scenario import ScenarioLikelihood
 
 
 def closure(fn):
@@ -14,7 +15,16 @@ def closure(fn):
 
 class PhysicalBatch:
     def __init__(self, scalar):
+        self.scenario = scalar if isinstance(scalar, ScenarioLikelihood) else None
+        if self.scenario is not None:
+            if scalar.domain != "real":
+                raise ValueError("The fast adapter only supports real-space likelihoods")
+            if scalar.model.orbit.observation_kind == "legacy":
+                raise ValueError("The fast adapter does not support legacy primary-only binaries")
+            self.kind, self.ndim, self.nsamples = scalar.kind, scalar.model.ndim, scalar.nsamples
+            return
         self.env = e = closure(scalar)
+        self.nsamples = e.get("nsamples")
         self.g = g = scalar.__globals__
         self.owner = scalar.__qualname__.split('.')[0]
         self.family = self.owner[4]
@@ -84,6 +94,8 @@ class PhysicalBatch:
         return np.where(dm>0, -np.inf, prior)
 
     def evaluate(self, theta):
+        if self.scenario is not None:
+            return self.scenario.physical_batch(theta)
         theta = np.asarray(theta, float)
         if theta.ndim != 2 or theta.shape[1] != self.ndim:
             raise ValueError('Unexpected physical parameter shape')
