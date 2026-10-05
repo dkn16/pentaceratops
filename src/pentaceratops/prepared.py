@@ -58,9 +58,17 @@ def _field(path, mission, target_id):
     if int(stars.iloc[0].ID) != target_id or not stars.iloc[0].tdepth > 0:
         raise ValueError("First stellar row must be the eligible configured target")
     eligible = stars[stars.tdepth > 0]
-    for key in ("plx", "Tmag", "Jmag", "Hmag", "Kmag", "fluxratio"):
+    for key in ("Tmag", "fluxratio"):
         if not np.isfinite(eligible[key]).all():
-            raise ValueError(f"Require finite {key} for every eligible host")
+            ids = eligible.loc[~np.isfinite(eligible[key]), "ID"].astype(int).tolist()
+            raise ValueError(f"Require finite {key} for eligible hosts {ids}")
+    # Only the target has companion/background scenarios. Resolved neighbors
+    # run NTP/NEB/NEBx2P, whose TP/EB wrappers do not consume J/H/K or parallax.
+    # Preserve unavailable catalog values instead of inventing photometry or
+    # removing otherwise eligible neighbors from the hypothesis set.
+    for key in ("plx", "Jmag", "Hmag", "Kmag"):
+        if not np.isfinite(stars.iloc[0][key]):
+            raise ValueError(f"Require finite {key} for target {target_id}")
     if not ((eligible.fluxratio > 0) & (eligible.fluxratio <= 1)).all():
         raise ValueError("Eligible host fluxratio must be in (0, 1]")
     return SimpleNamespace(mission=mission, stars=stars, ID=target_id)

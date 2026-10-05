@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-05",
+  "version": "0.1.0.dev12",
+  "source_sha256": "8d8b87f1ecbd2b36fecc25443e074caebcb0ddeab6317d99ebe1f5168dd97b9c",
+  "standalone_wheel": {
+    "file": "dist/pentaceratops-0.1.0.dev12-py3-none-any.whl",
+    "sha256": "e8a277c630e268851604ee903d9c2c67259f61f6f883b67f553829b5a074402a",
+    "tests": 689,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 98.008
+  },
+  "new_tests": {
+    "count": 9,
+    "coverage": [
+      "all nearby Real/Fourier evidence, physical samples and weights exactly unchanged when unused J/H/K/parallax are NaN",
+      "target photometry/parallax remain required; missing neighbor mass remains an error",
+      "preparation and reload retain eligible neighbors with missing infrared photometry",
+      "adopted one-footer population copied byte for byte with unchanged historical reader selection"
+    ]
+  },
+  "real_preparation": {
+    "candidate": "TOI-700.02",
+    "host_id": 150428135,
+    "sectors": 37,
+    "catalog_sources": 253,
+    "eligible_sources": 7,
+    "missing_neighbor_JHK": [
+      736940566,
+      736940558,
+      736940565
+    ],
+    "prepared_and_reloaded": true,
+    "population": "Existing adopted TOI-700 TRILEGAL file, unchanged"
+  },
+  "scope": "Validation and input compatibility only; no imputed photometry, excluded neighbors, production evidence runs, or changes to saved FPP/paper results."
+}

@@ -111,6 +111,37 @@ def test_wrong_target_or_input_type_is_rejected(monkeypatch, tmp_path):
         evidence(candidate_folded_real(saved), target=host, likelihood="fourier")
 
 
+@pytest.mark.parametrize("column", ["plx", "Jmag", "Hmag", "Kmag"])
+def test_target_still_requires_background_inputs(monkeypatch, tmp_path, column):
+    saved, _, _ = prepared(monkeypatch)
+    host = field(tmp_path)
+    host.stars.loc[host.stars.index[0], column] = np.nan
+    monkeypatch.setattr("pentaceratops.preprocessing.evidence_inputs.candidate_folded_real",
+                        lambda *a, **k: pytest.fail("Reject before covariance or sampling"))
+    with pytest.raises(ValueError, match=f"finite {column} for target 123"):
+        evidence(saved, target=host)
+
+
+@pytest.mark.parametrize("domain", ["real", "fourier"])
+def test_unused_neighbor_photometry_does_not_change_any_nearby_fit(monkeypatch, tmp_path, domain):
+    saved, _, _ = prepared(monkeypatch)
+    host = field(tmp_path)
+    options = dict(likelihood=domain, N=8, steps=1, nsamples=3, seed=307,
+                   posterior_samples=9, scenarios=["NTP", "NEB", "NEBx2P"])
+    complete = evidence(saved, target=host, **options)
+    neighbor = host.stars.index[1]
+    host.stars.loc[neighbor, ["plx", "Jmag", "Hmag", "Kmag"]] = np.nan
+    missing = evidence(saved, target=host, **options)
+    assert missing.output.scenario.tolist() == ["NTP", "NEB", "NEBx2P"]
+    assert np.isfinite(missing.output.lnBF).all()
+    np.testing.assert_array_equal(missing.output.lnBF, complete.output.lnBF)
+    for key, record in missing.metadata["scenario_records"].items():
+        reference = complete.metadata["scenario_records"][key]
+        np.testing.assert_array_equal(record["physical_parameters"], reference["physical_parameters"])
+        np.testing.assert_array_equal(record["weights"], reference["weights"])
+    assert host.stars.loc[neighbor, ["plx", "Jmag", "Hmag", "Kmag"]].isna().all()
+
+
 @pytest.mark.parametrize("first_import", ["import pentaceratops.hz", "from pentaceratops.evidence import evidence"])
 def test_evidence_function_and_existing_submodules_coexist(first_import):
     code = first_import + "\n" + """

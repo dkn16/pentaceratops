@@ -82,6 +82,11 @@ positive values identify eligible hosts. Do not set every row positive by hand
 or omit nearby sources to obtain a target-only FPP. The likelihood evaluates
 all eligible hosts in the same aperture flux frame.
 
+J/H/K magnitudes and parallax must be finite for the target. They may be
+missing (`NaN`) for resolved neighbors: NTP/NEB/NEBx2P do not use them.
+Eligible neighbors still require mass, radius, temperature, TESS magnitude
+and aperture flux fraction. Missing infrared photometry never excludes a host.
+
 An existing field object can be exported with
 `target.stars.to_csv("stars.csv", index=False)`. Supply the same TRILEGAL file
 used for that field. An optional top-level `"molusc": "molusc.csv"` selects the

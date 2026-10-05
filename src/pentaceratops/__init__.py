@@ -3,7 +3,7 @@
 Importing the package performs no catalogue queries or downloads.
 """
 
-__version__ = "0.1.0.dev11"
+__version__ = "0.1.0.dev12"
 __all__ = ["Target", "calc_probs_fourier", "run_evidence", "RunResult",
            "scenario_probabilities", "calc_probs_folded_real", "calc_probs_folded_fourier",
            "load_folded_real", "prepare_folded_fourier", "FoldedFourierData",

@@ -76,9 +76,12 @@ target = prepare_target(
 )
 ```
 
-The existing population is copied without changing its stellar rows. It must
-correspond to this sky position and retain the two terminal records expected
-by the current likelihood reader. New downloads are saved in that same format.
+The existing population is copied byte for byte and must correspond to this
+sky position. The current likelihood reader excludes the last two records;
+adopted service CSVs with either one or two footer records are accepted with
+that same historical row selection. They are not rewritten or reinterpreted.
+New downloads include two explicit footer records so all downloaded stellar
+rows reach the likelihood reader.
 
 Other keyword arguments are:
 
@@ -93,8 +96,11 @@ Other keyword arguments are:
 
 Supplied stellar inputs use solar mass/radius, kelvin, milliarcsecond parallax
 and RA/Dec degrees. All sources need coordinates and TESS magnitudes for
-aperture dilution. Required properties must be finite for eligible hosts;
-missing mass/radius/temperature values must be supplied from adopted stellar
+aperture dilution. Eligible hosts require mass, radius and temperature.
+J/H/K magnitudes and parallax are required for the target; resolved neighbors
+may retain `NaN` because their NTP/NEB/NEBx2P fits do not use those fields.
+No photometry is invented and no eligible neighbor is dropped. Missing
+mass/radius/temperature values must be supplied from adopted stellar
 information. The helper does not substitute solar values. To correct catalog
 properties, supply a corrected `stars` table and write to a new field directory.
 Record the sources of corrections and follow-up exclusions alongside it.

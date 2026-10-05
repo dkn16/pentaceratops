@@ -79,15 +79,15 @@ def _population_body(table):
 
 
 def _validate_population(path):
-    # The existing likelihood reader excludes two terminal records. Require
-    # that convention explicitly so it cannot silently discard real stars.
+    # Validate exactly the rows consumed by the existing reader ([:-2]). Some
+    # adopted service CSVs have just one footer, so preserve their bytes and
+    # historical row selection rather than rejecting or rewriting them here.
     table = pd.read_csv(path)
     if len(table) < 3:
-        raise ValueError("TRILEGAL CSV requires stellar rows and two terminal records")
+        raise ValueError("TRILEGAL CSV has no stellar rows under the existing reader convention")
     _population_body(table.iloc[:-2])
-    endings = pd.to_numeric(table.iloc[-2:]["Mact"], errors="coerce")
-    if endings.notna().any():
-        raise ValueError("TRILEGAL CSV must retain its two non-stellar terminal records")
+    if not table.iloc[-1].astype(str).str.startswith("#TRILEGAL").any():
+        raise ValueError("TRILEGAL CSV must retain its completion record")
 
 
 def _download_population(ra, dec, destination, *, mag_lim, timeout, poll_interval):

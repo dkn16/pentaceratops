@@ -107,6 +107,20 @@ def test_query_download_and_population_reader_round_trip(monkeypatch, tmp_path, 
     assert target.field_metadata["population"]["source"] == "TRILEGAL"
 
 
+def test_adopted_single_footer_population_is_copied_without_changing_reader_selection(monkeypatch, tmp_path, inputs):
+    saved, stars, population = inputs
+    no_network(monkeypatch)
+    table = pd.read_csv(population).drop(index=2)  # Real service files may have only the final footer.
+    table.to_csv(population, index=False)
+    expected = trilegal_results(population, 10.)
+    target = prepare_target(saved, tmp_path/"field", stars=stars, trilegal_fname=population)
+    assert Path(target.trilegal_fname).read_bytes() == population.read_bytes()
+    for actual, reference in zip(trilegal_results(target.trilegal_fname, 10.), expected):
+        np.testing.assert_array_equal(actual, reference)
+    # This test freezes the adopted reader behavior, not a reinterpretation of its input.
+    assert len(expected[0]) == 1
+
+
 @pytest.mark.parametrize("damage", ["mission", "depth", "fits", "id", "missing_mass", "empty_population"])
 def test_bad_inputs_fail_without_population_download(monkeypatch, tmp_path, inputs, damage):
     saved, stars, population = inputs
@@ -138,6 +152,27 @@ def test_explicit_fractional_depth_and_csv_catalog(monkeypatch, tmp_path, inputs
                             trilegal_fname=population, transit_depth=.02)
     np.testing.assert_allclose(target.stars.tdepth*target.stars.fluxratio, .02)
     assert target.field_metadata["depth_source"] == "explicit"
+
+
+def test_missing_neighbor_photometry_survives_preparation_and_reload(monkeypatch, tmp_path, inputs):
+    saved, stars, population = inputs
+    no_network(monkeypatch)
+    columns = ["plx", "Jmag", "Hmag", "Kmag"]
+    stars.loc[stars.ID == "456", columns] = np.nan
+    target = prepare_target(saved, tmp_path/"field", stars=stars, trilegal_fname=population)
+    for host in (target, load_target(tmp_path/"field")):
+        assert host.stars.ID.tolist() == [123, 456]
+        assert host.stars.iloc[1].tdepth > 0
+        assert host.stars.loc[1, columns].isna().all()
+
+
+def test_missing_neighbor_mass_remains_an_error(monkeypatch, tmp_path, inputs):
+    saved, stars, population = inputs
+    no_network(monkeypatch)
+    stars.loc[stars.ID == "456", "mass"] = np.nan
+    with pytest.raises(ValueError, match="Invalid mass for host 456"):
+        prepare_target(saved, tmp_path/"field", stars=stars, trilegal_fname=population)
+    assert not (tmp_path/"field").exists()
 
 
 def test_broken_output_symlink_is_not_followed(monkeypatch, tmp_path, inputs):

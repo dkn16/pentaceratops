@@ -108,6 +108,11 @@ columns are `ID, mass, rad, Teff, plx, Tmag, Jmag, Hmag, Kmag, tdepth, fluxratio
 `tdepth > 0` selects eligible hosts, and `fluxratio` is each host's aperture
 flux fraction. The call does not construct or download this field.
 
+J/H/K magnitudes and parallax must be finite for the target. They may be
+missing (`NaN`) for resolved neighbors: NTP/NEB/NEBx2P do not use them.
+Eligible neighbors still require mass, radius, temperature, TESS magnitude
+and aperture flux fraction. Missing infrared photometry never excludes a host.
+
 If the population path is not attached to the object, pass
 `trilegal_fname="/path/to/trilegal.csv"`. Optional `molusc_file` supplies the
 prepared companion population. Candidate bundles must match the target ID
