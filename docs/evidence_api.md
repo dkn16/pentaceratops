@@ -1,14 +1,26 @@
 # Evidence from Python
 
-Create `prepared` with the provided preprocessing function, then pass it to
-`evidence`. In this example, `target` is your already prepared stellar-field
-object for the same candidate; its required attributes are described below.
+Create `prepared` with the provided preprocessing function and load `target`
+from the saved stellar field for the same candidate. The field contains the
+host, nearby sources, aperture dilution, and a TRILEGAL background population.
+If you do not have these files yet, follow [target setup](target_setup.md)
+first; it shows catalog queries, dilution, population preparation, and saving.
 
 ```python
+from types import SimpleNamespace
+import pandas as pd
+
 from pentaceratops.preprocessing.candidate import prepare_candidate
 from pentaceratops.evidence import evidence
 
 prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
+# Load the stellar field saved for this candidate (see target setup below).
+candidate = prepared.metadata["settings"]["candidate"]
+target = SimpleNamespace(
+    ID=int(candidate["host_id"]), mission=candidate["mission"],
+    stars=pd.read_csv("/path/to/field/stars.csv"),
+    trilegal_fname="/path/to/field/trilegal.csv",
+)
 results = evidence(prepared, target=target, likelihood="fourier", N=500, steps=50, eb_eta=0.1)
 ```
 
@@ -50,12 +62,21 @@ script prints the same kind of preparation path.
 Load that saved bundle without downloading or detrending again:
 
 ```python
+from types import SimpleNamespace
+import pandas as pd
+
 from pentaceratops import RunResult
 from pentaceratops.evidence import evidence
 
 prepared_path = "/path/to/cache/prepared/<candidate>_<hash>.npz"  # Copy the printed path.
 prepared = RunResult.load(prepared_path)
-# target is your already prepared stellar-field object for this candidate.
+# Load the stellar field saved for this candidate (see target setup below).
+candidate = prepared.metadata["settings"]["candidate"]
+target = SimpleNamespace(
+    ID=int(candidate["host_id"]), mission=candidate["mission"],
+    stars=pd.read_csv("/path/to/field/stars.csv"),
+    trilegal_fname="/path/to/field/trilegal.csv",
+)
 results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
 ```
 
@@ -64,8 +85,9 @@ The same candidate preparation works with `likelihood="real"` or `"fourier"`;
 the evidence function constructs the corresponding covariance from its saved
 PSD and fit state. No preprocessing rerun is needed to switch likelihoods.
 
-For existing likelihood-ready HZ files, create `prepared` using the matching
-loader instead of `RunResult.load`:
+For existing likelihood-ready HZ files, reuse the matching `target` field
+from above and create `prepared` with the matching loader below. These blocks
+continue the preceding setup; the folded files do not contain a stellar field.
 
 ```python
 from pentaceratops import load_folded_real
@@ -89,6 +111,9 @@ the candidate-script bundle. See [folded HZ preparation](hz_runs.md) for how
 those likelihood-ready products are constructed.
 
 ## Stellar-field input
+
+The [target setup guide](target_setup.md) shows how to construct a new TESS
+field and save it, and how to load the field from an existing HZ run.
 
 `target` supplies `.mission`, `.stars` and `.trilegal_fname`; it can be an existing
 prepared `Target` or an object with those attributes. `.stars` is the in-memory

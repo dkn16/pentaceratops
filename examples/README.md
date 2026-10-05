@@ -7,13 +7,26 @@ They download and preprocess photometry; **they do not calculate an FPP**.
 For the Python workflow, obtain `prepared` directly from preprocessing:
 
 ```python
+from types import SimpleNamespace
+import pandas as pd
+
 from pentaceratops.preprocessing.candidate import prepare_candidate
 from pentaceratops.evidence import evidence
 
 prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
-# target is your already prepared stellar-field object for this candidate.
+# Load the stellar field saved for this candidate (see target setup below).
+candidate = prepared.metadata["settings"]["candidate"]
+target = SimpleNamespace(
+    ID=int(candidate["host_id"]), mission=candidate["mission"],
+    stars=pd.read_csv("/path/to/field/stars.csv"),
+    trilegal_fname="/path/to/field/trilegal.csv",
+)
 results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
 ```
+
+The field files come from [target setup](../docs/target_setup.md): query the stars, calculate
+aperture dilution, and save the field and background population, or reuse
+the corresponding files from an existing HZ run.
 
 The function returns the preparation object and the path where it was saved.
 If you ran one of the scripts below instead, copy its `Prepared data: ...`

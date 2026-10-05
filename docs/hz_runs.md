@@ -4,13 +4,26 @@ For a candidate bundle saved by the example preprocessing scripts, load
 `prepared` from the NPZ filename printed after `Prepared data:`:
 
 ```python
+from types import SimpleNamespace
+import pandas as pd
+
 from pentaceratops import RunResult
 from pentaceratops.evidence import evidence
 
 prepared = RunResult.load("/path/to/cache/prepared/<candidate>_<hash>.npz")
-# target is your already prepared stellar-field object for this candidate.
+# Load the stellar field saved for this candidate (see target setup below).
+candidate = prepared.metadata["settings"]["candidate"]
+target = SimpleNamespace(
+    ID=int(candidate["host_id"]), mission=candidate["mission"],
+    stars=pd.read_csv("/path/to/field/stars.csv"),
+    trilegal_fname="/path/to/field/trilegal.csv",
+)
 results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
 ```
+
+The field files come from [target setup](target_setup.md): query the stars, calculate
+aperture dilution, and save the field and background population, or reuse
+the corresponding files from an existing HZ run.
 
 The [Python interface](evidence_api.md) also shows how to create `prepared`
 directly with `prepare_candidate`. The paired Real caches and folded Fourier
