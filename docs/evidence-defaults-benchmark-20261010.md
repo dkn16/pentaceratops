@@ -53,8 +53,9 @@ is outside the timed evidence call.
   timing check does not establish convergence or replace paper results.
   The reported FPP was 4.125% with uniform effort and
   3.312% with scenario defaults in this single-seed comparison.
-- This is a full-target subtracted-likelihood timing. It does not measure a
-  complete marginalized-likelihood run.
+- This report measures the full-target subtracted likelihood. The matching
+  [complete marginalized-likelihood benchmark](evidence-fourier-benchmark-20261010.md)
+  records the Fourier covariance and all 33 scenario fits separately.
 
 The default settings and recorded output fields are described in the
 [Python evidence guide](evidence_api.md#arguments).

@@ -165,8 +165,9 @@ Its attributes `sampling_config` and `sampling_policy_version` retain the
 resolved policy and override flags; attributes `N` and `steps` retain the
 requested global overrides (`None` when the policy supplies that field).
 These records survive `RunResult.save` / `load`. See the
-[TOI-700.02 timing comparison](evidence-defaults-benchmark-20261010.md) for a
-complete 33-scenario benchmark of these defaults.
+[TOI-700.02 subtracted-likelihood timing](evidence-defaults-benchmark-20261010.md)
+and [full Fourier timing](evidence-fourier-benchmark-20261010.md) for complete
+33-scenario benchmarks of these defaults.
 
 Other defaults remain seed 42, 2000 posterior draws, profile parity, and eta=1.
 Exposure integration defaults to 20 subsamples for Real and 7 for Fourier. The example explicitly chooses the paper odds, eta=0.1.
