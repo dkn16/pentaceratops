@@ -16,6 +16,7 @@ from .experimental.covariance import PANELS, scenario_kwargs
 from .experimental.v2_adapter import OptimizedAdapter
 from .experimental.primary_v2 import PrimaryOnlyAdapter
 from .results import RunResult, scenario_probabilities
+from .sampling.policy import POLICY_VERSION, sampling_policy
 
 
 def _positive_integer(value, name):
@@ -93,7 +94,9 @@ def real_adapter(data, *, mission, filt=None, primary_only=False, include_gp=Tru
 
 def _dispatch(target, adapter, *, trilegal_fname, molusc_file, N, steps, seed,
               posterior_samples, eb_eta, scenarios, missing_host_policy):
-    N, steps = _positive_integer(N, "N"), _positive_integer(steps, "steps")
+    N = None if N is None else _positive_integer(N, "N")
+    steps = None if steps is None else _positive_integer(steps, "steps")
+    policy = sampling_policy(N=N, steps=steps)
     posterior_samples = _positive_integer(posterior_samples, "posterior_samples")
     if isinstance(seed, (bool, np.bool_)) or not isinstance(seed, Integral) or seed < 0:
         raise ValueError("seed must be a nonnegative integer")
@@ -142,21 +145,26 @@ def _dispatch(target, adapter, *, trilegal_fname, molusc_file, N, steps, seed,
     # Check every eligible host before the first potentially expensive fit.
     for star, scenario, scenario_seed, molusc in tasks:
         adapter.aperture_fraction = float(star.fluxratio)
+        config = policy[scenario]
         result = sample_joint_scenario(
             adapter, scenario, star, trilegal=population, molusc=molusc,
-            N=N, steps=steps, seed=scenario_seed, posterior_samples=posterior_samples,
+            N=config["N"], steps=config["steps"], seed=scenario_seed,
+            posterior_samples=posterior_samples,
         )
         if not np.isfinite(result["lnBF"]) and not result.get("empty_support", False):
             raise RuntimeError(f"Unfinished/nonfinite evidence: {star.ID}/{scenario}")
         records[f"{int(star.ID)}:{scenario}"] = result
         rows.append(dict(ID=int(star.ID), scenario=scenario, lnBF=result["lnBF"],
                          lnZ=result["lnZ"], null_loglike=result["null_loglike"],
-                         aperture_fraction=adapter.aperture_fraction, seed=scenario_seed))
+                         aperture_fraction=adapter.aperture_fraction, seed=scenario_seed,
+                         sampling_N=config["N"], sampling_steps=config["steps"]))
     table = scenario_probabilities(pd.DataFrame(rows), evidence_column="lnBF", eb_eta=eb_eta)
     table.attrs.update(posterior_records=records, backend=adapter.backend,
                        scenario_scope="all" if selected is None else "conditional_subset",
                        missing_host_policy=missing_host_policy, stellar_replacements=replacements,
                        N=N, steps=steps, nsamples=adapter.nsamples, parity=adapter.parity,
+                       sampling_policy_version=POLICY_VERSION,
+                       sampling_config={s: policy[s] for s in dict.fromkeys(table.scenario)},
                        posterior_samples=posterior_samples, mission=adapter.mission,
                        timing_policy=getattr(adapter, "timing_policy", "observed"),
                        flux_frame="aperture", evidence_frame="same_data_null_log_bayes_factor")
@@ -182,7 +190,7 @@ def _run(target, adapter, *, output_path, seed, metadata, **options):
 
 
 def calc_probs_folded_real(target, data, *, trilegal_fname=None, molusc_file=None,
-                           N=500, steps=50, nsamples=20, seed=42, posterior_samples=2000,
+                           N=None, steps=None, nsamples=20, seed=42, posterior_samples=2000,
                            parity="profile", eb_eta=1., primary_only=False, include_gp=True,
                            filt=None, scenarios=None, missing_host_policy="error", output_path=None,
                            timing_policy="observed"):
@@ -195,6 +203,8 @@ def calc_probs_folded_real(target, data, *, trilegal_fname=None, molusc_file=Non
     contact times. timing_policy="legacy" restores the archived x2P center-only
     gate. Both policies preserve the existing ordinary-EB flat-secondary penalty.
     With scenarios supplied, the returned FPP is conditional on that subset.
+    Omitted N/steps use the shared scenario policy; integer overrides apply
+    independently to every scenario.
     """
     if output_path is not None:
         RunResult.check_destination(output_path)
@@ -214,7 +224,7 @@ def calc_probs_folded_real(target, data, *, trilegal_fname=None, molusc_file=Non
 
 
 def calc_probs_folded_fourier(target, folded, *, trilegal_fname=None, molusc_file=None,
-                              N=500, steps=50, nsamples=7, seed=42, posterior_samples=2000,
+                              N=None, steps=None, nsamples=7, seed=42, posterior_samples=2000,
                               parity="profile", eb_eta=1., filt=None, scenarios=None,
                               missing_host_policy="error", output_path=None):
     """Return a RunResult for the full-orbit folded PSD likelihood.
@@ -223,6 +233,8 @@ def calc_probs_folded_fourier(target, folded, *, trilegal_fname=None, molusc_fil
     memory-mapped. Physical predictions use every contributing native exposure.
     This is the latest full-orbit HZ convention; archive-reproduction recipes are
     available separately and are not silently substituted.
+    Omitted N/steps use the shared scenario policy; integer overrides apply
+    independently to every scenario.
     """
     from .preprocessing.folded import FoldedFourierData
     if output_path is not None:

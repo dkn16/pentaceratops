@@ -150,9 +150,12 @@ the command does not reinterpret those archives as full-orbit inputs.
 
 CLI overrides include `--N`, `--steps`, `--nsamples`, `--seed`,
 `--posterior-samples`, and `--eb-eta`. They override the JSON settings. Absent
-settings use the HZ API defaults: 500 particles, 50 steps, seed 42, 2000 posterior
-draws, profile parity and eta=1; exposure integration uses 20 subsamples for Real
-or 7 for Fourier. The example explicitly chooses the paper's eta=0.1.
+`N`/`steps` settings (or JSON `null`) use the [shared scenario policy](evidence_api.md#arguments).
+An explicit integer overrides that field for every scenario independently;
+`"N": 500, "steps": 50` reproduces the previous uniform effort settings.
+Other defaults are seed 42, 2000 posterior draws, profile parity and eta=1;
+exposure integration uses 20 subsamples for Real or 7 for Fourier.
+The example explicitly chooses the paper's eta=0.1.
 Particle counts are effort settings, not evidence-convergence guarantees.
 
 The JSON also accepts `scenarios`, `parity`, `filt`, `missing_host_policy`, and,

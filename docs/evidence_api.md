@@ -12,7 +12,7 @@ from pentaceratops.evidence import evidence
 
 prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
 target = prepare_target(prepared, output_dir="/path/to/new_field")
-results = evidence(prepared, target=target, likelihood="fourier", N=500, steps=50, eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
 ```
 
 `prepare_candidate` resolves the ephemeris, downloads photometry when needed,
@@ -146,9 +146,30 @@ population and any loaded preparation files are retained in the result.
 The explicit signature accepts `N`, `steps`, `nsamples`, `seed`,
 `posterior_samples`, `parity`, `eb_eta`, `scenarios`, `filt`,
 `missing_host_policy`, `trilegal_fname`, `molusc_file`, and `output_path`.
-Defaults remain 500 particles, 50 steps, seed 42, 2000 posterior draws, profile
-parity, and eta=1. Exposure integration defaults to 20 subsamples for Real and
-7 for Fourier. The example explicitly chooses the paper odds, eta=0.1.
+Omitted `N` and `steps` (or explicit `None`) use the shared scenario policy:
+
+| Scenarios | `N` | `steps` |
+| --- | ---: | ---: |
+| TP, PTP, DTP, NTP, SEBx2P | 100 | 20 |
+| SEB, BEBx2P | 200 | 50 |
+| STP, BEB | 500 | 50 |
+| All remaining scenarios | 200 | 30 |
+
+An explicit integer overrides only that field for every scenario. For example,
+`N=300` keeps each scenario's default steps, while `N=500, steps=50` reproduces
+the previous uniform effort settings. These are provisional computational
+choices, not guarantees of evidence precision.
+
+The table records actual settings in `sampling_N` and `sampling_steps` columns.
+Its attributes `sampling_config` and `sampling_policy_version` retain the
+resolved policy and override flags; attributes `N` and `steps` retain the
+requested global overrides (`None` when the policy supplies that field).
+These records survive `RunResult.save` / `load`. See the
+[TOI-700.02 timing comparison](evidence-defaults-benchmark-20261010.md) for a
+complete 33-scenario benchmark of these defaults.
+
+Other defaults remain seed 42, 2000 posterior draws, profile parity, and eta=1.
+Exposure integration defaults to 20 subsamples for Real and 7 for Fourier. The example explicitly chooses the paper odds, eta=0.1.
 
 Real-only options are `primary_only`, `include_gp` and `timing_policy`, defaulting
 to `False`, `True` and `"observed"`. Explicit false values are honored; these

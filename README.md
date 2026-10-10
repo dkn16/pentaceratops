@@ -255,8 +255,10 @@ validation stage and do not replace the planned three-stage interface.
   on configurable scratch paths. Set `MPLCONFIGDIR` and `NUMBA_CACHE_DIR`
   there as well. Small plots, summaries, and source code can remain in home.
 - Sampling effort defaults are provisional, not guarantees of evidence
-  precision. Fourier dispatcher defaults are not silently replaced by the
-  real-space per-scenario policy.
+  precision. `evidence()` and the folded real/Fourier interfaces use the
+  [shared per-scenario policy](docs/evidence_api.md#arguments) by default.
+  Explicit `N`/`steps` override those fields independently for every scenario;
+  archived compatibility interfaces retain their historical signatures.
 
 ## Code layout
 

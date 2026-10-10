@@ -210,9 +210,14 @@ mission, sampler settings, parity policy, timing policy, and likelihood frame.
 equal-weight posterior draws, and the independently replayed scalar best fit.
 Versions, code fingerprint, stellar inputs, and population paths are recorded.
 
-`N`, `steps`, and `nsamples` are separate controls. The defaults 500/50 are
-convenient effort settings, not a claim that every adopted paper run used them
-or that evidence has converged. The real/Fourier exposure defaults are 20/7.
+`N`, `steps`, and `nsamples` are separate controls. Omitted `N`/`steps` or
+explicit `None` use the [shared scenario policy](evidence_api.md#arguments).
+Explicit integers override those fields independently for every scenario;
+`N=500, steps=50` retains the previous uniform effort settings. Actual values
+are saved in the table's `sampling_N`/`sampling_steps` columns and its
+`sampling_config`/`sampling_policy_version` attributes. These provisional
+settings are not a claim that every adopted paper run used them or that
+evidence has converged. The real/Fourier exposure defaults are 20/7.
 Use the frozen campaign configuration to reproduce a particular row.
 The default demographic multiplier remains `eb_eta=1`; specify **0.1** for
 the paper's reported odds. It is applied once to EB scenario weights.

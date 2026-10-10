@@ -9,7 +9,7 @@ from pentaceratops.evidence import evidence
 
 prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
 target = prepare_target(prepared, output_dir="/path/to/new_field")
-results = evidence(prepared, target=target, likelihood="fourier", N=500, steps=50, eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
 ```
 
 `prepare_target` creates a new TESS field; `load_target` reloads its saved

@@ -202,3 +202,30 @@ def test_load_existing_hz_real_and_fourier_inputs(monkeypatch, tmp_path):
         path.write_text(json.dumps(config))
         result = run_prepared(path)
         assert result.metadata["prepared_run"]["input_format"] == "folded_"+domain
+
+
+@pytest.mark.parametrize("domain", ["real", "fourier"])
+@pytest.mark.parametrize("settings,overrides,expected", [
+    ({}, {}, {"TP": (100, 20), "EB": (200, 30), "NTP": (100, 20)}),
+    ({"N": None, "steps": None}, {}, {"TP": (100, 20), "EB": (200, 30), "NTP": (100, 20)}),
+    ({"N": 17, "steps": None}, {"steps": 4}, {"TP": (17, 4), "EB": (17, 4), "NTP": (17, 4)}),
+])
+def test_prepared_config_uses_shared_defaults(monkeypatch, tmp_path, domain, settings, overrides, expected):
+    saved, _, _ = prepared(monkeypatch)
+    path, config = configuration(tmp_path, saved)
+    config["likelihood"] = domain
+    config["settings"].pop("N")
+    config["settings"].pop("steps")
+    config["settings"].update(settings)
+    path.write_text(json.dumps(config))
+    calls = {}
+
+    def sample(adapter, scenario, star, **options):
+        calls[scenario] = (options["N"], options["steps"])
+        return dict(lnBF=1., lnZ=2., null_loglike=1.)
+
+    monkeypatch.setattr("pentaceratops.hz.sample_joint_scenario", sample)
+    result = run_prepared(path, **overrides)
+    assert calls == expected
+    assert result.metadata["prepared_run"]["resolved_settings"]["N"] == settings.get("N")
+    assert result.output.attrs["sampling_config"]["NTP"]["steps"] == expected["NTP"][1]

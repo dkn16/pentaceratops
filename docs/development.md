@@ -94,9 +94,10 @@ their extraction hashes without modifying them.
   warnings. NumPy is temporarily bounded to `>=2.0,<2.3`; the upgrade check
   holds NumPy at 2.2.6 instead of simultaneously changing that numerical stack.
 - The engine supports process parallelism, not concurrent threads.
-- Real-space effort defaults are provisional, not guarantees of `std(log Z)`.
-  Fourier dispatcher defaults retain their historical signature and are not
-  silently replaced by the real-space policy.
+- Shared scenario effort defaults are provisional, not guarantees of `std(log Z)`.
+  The current `evidence()` and folded real/Fourier entry points use this policy
+  when `N`/`steps` are omitted. Explicit integer overrides apply independently.
+  Archived compatibility interfaces retain their historical signatures.
 
 ## Review checklist
 

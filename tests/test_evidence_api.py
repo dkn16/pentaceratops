@@ -86,7 +86,8 @@ def test_optional_output_directory_input_and_real_options(monkeypatch, tmp_path)
     assert len(calls) == 2
 
 
-@pytest.mark.parametrize("options", [dict(N=0), dict(steps=0), dict(nsamples=0),
+@pytest.mark.parametrize("options", [dict(N=0), dict(N=True), dict(N=1.5),
+    dict(steps=0), dict(steps=False), dict(steps=-1), dict(nsamples=0),
     dict(likelihood="fourier", include_gp=False), dict(likelihood="fourier", timing_policy="legacy"),
     dict(primary_only=True), dict(unknown_option=True)])
 def test_invalid_direct_options_fail_before_covariance(monkeypatch, tmp_path, options):
@@ -156,3 +157,51 @@ assert 'target' in inspect.signature(evidence).parameters
 assert callable(real.lnZ_TTP) and callable(fourier.lnZ_TTP_fourier)
 """
     subprocess.run([sys.executable, "-c", code], check=True, capture_output=True, text=True)
+
+
+@pytest.mark.parametrize("domain", ["real", "fourier"])
+@pytest.mark.parametrize("overrides", [{}, {"N": None, "steps": None},
+                                     {"N": 17}, {"steps": 4}, {"N": 17, "steps": 4}])
+def test_shared_scenario_defaults_and_independent_overrides(monkeypatch, tmp_path, domain, overrides):
+    """Exercise the public call through dispatch, including nearby-star labels."""
+    from pentaceratops import hz
+    from pentaceratops.sampling.policy import POLICY_VERSION
+    saved, _, _ = prepared(monkeypatch)
+    host = field(tmp_path)
+    calls = []
+
+    def sample(adapter, scenario, star, **options):
+        calls.append((int(star.ID), scenario, options["N"], options["steps"], options["seed"]))
+        return dict(lnBF=1., lnZ=2., null_loglike=1., N=options["N"], steps=options["steps"])
+
+    monkeypatch.setattr(hz, "sample_joint_scenario", sample)
+    result = evidence(saved, target=host, likelihood=domain, **overrides)
+    assert len(calls) == 18
+    expected = {label: (200, 30) for label in (*hz.FAMILIES, "NTP", "NEB", "NEBx2P")}
+    expected.update({label: (100, 20) for label in ("TP", "PTP", "DTP", "NTP", "SEBx2P")})
+    expected.update(SEB=(200, 50), BEBx2P=(200, 50), STP=(500, 50), BEB=(500, 50))
+    for ordinal, (ID, label, N, steps, seed) in enumerate(calls):
+        assert N == (expected[label][0] if overrides.get("N") is None else overrides["N"])
+        assert steps == (expected[label][1] if overrides.get("steps") is None else overrides["steps"])
+        assert seed == 42+1009*ordinal
+        config = result.output.attrs["sampling_config"][label]
+        assert (config["N"], config["steps"]) == (N, steps)
+        assert config["N_overridden"] == (overrides.get("N") is not None)
+        assert config["steps_overridden"] == (overrides.get("steps") is not None)
+        row = result.output.iloc[ordinal]
+        assert (row.sampling_N, row.sampling_steps) == (N, steps)
+        record = result.metadata["scenario_records"][f"{ID}:{label}"]
+        assert (record["N"], record["steps"]) == (N, steps)
+    assert result.output.attrs["sampling_policy_version"] == POLICY_VERSION
+    assert result.output.attrs["N"] == overrides.get("N")
+    assert result.output.attrs["steps"] == overrides.get("steps")
+
+    # Calling either lower-level folded entry point must resolve the same policy.
+    calculate = calc_probs_folded_real if domain == "real" else calc_probs_folded_fourier
+    data = candidate_folded_real(saved) if domain == "real" else candidate_folded_fourier(saved)
+    reference = calculate(host, data, **overrides)
+    pd.testing.assert_frame_equal(result.output, reference.output)
+    loaded = RunResult.load(result.save(tmp_path/"policy.npz"))
+    assert loaded.output.attrs["sampling_policy_version"] == POLICY_VERSION
+    assert loaded.output.attrs["sampling_config"] == result.output.attrs["sampling_config"]
+    pd.testing.assert_frame_equal(loaded.output, result.output)

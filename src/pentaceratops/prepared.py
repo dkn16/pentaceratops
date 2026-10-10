@@ -14,7 +14,7 @@ from .results import RunResult
 from .sampling.records import snapshot
 
 
-COMMON_DEFAULTS = dict(N=500, steps=50, seed=42, posterior_samples=2000,
+COMMON_DEFAULTS = dict(N=None, steps=None, seed=42, posterior_samples=2000,
                        parity="profile", eb_eta=1., missing_host_policy="error")
 COMMON_OPTIONS = set(COMMON_DEFAULTS) | {"nsamples", "scenarios", "filt"}
 REAL_OPTIONS = {"primary_only", "include_gp", "timing_policy"}
@@ -93,6 +93,8 @@ def _options(domain, settings):
         options.update(primary_only=False, include_gp=True, timing_policy="observed")
     options.update(settings)
     for key in ("N", "steps", "nsamples", "posterior_samples"):
+        if key in ("N", "steps") and options[key] is None:
+            continue
         hz._positive_integer(options[key], key)
     if (isinstance(options["seed"], (bool, np.bool_)) or not isinstance(options["seed"], Integral)
             or not 0 <= options["seed"] < 2**32):
@@ -118,7 +120,7 @@ def _options(domain, settings):
     return options
 
 
-def evidence(prepared, *, target, likelihood="real", N=500, steps=50, nsamples=None,
+def evidence(prepared, *, target, likelihood="real", N=None, steps=None, nsamples=None,
              seed=42, posterior_samples=2000, parity="profile", eb_eta=1.,
              trilegal_fname=None, molusc_file=None, filt=None, scenarios=None,
              missing_host_policy="error", primary_only=None, include_gp=None,
@@ -137,6 +139,9 @@ def evidence(prepared, *, target, likelihood="real", N=500, steps=50, nsamples=N
     All target/nearby scenarios run by default. A scenarios subset reports a
     conditional FPP. No catalog lookup or population download is performed.
 
+    N/steps default to the shared per-scenario sampling policy. An explicit
+    integer overrides only that field for every scenario; None uses the policy.
+    Resolved settings and the policy version are saved in output.attrs.
     Exposure subsamples default to 20 for Real or 7 for Fourier. Real-only
     primary_only/include_gp/timing_policy default to False/True/observed;
     supplying these for Fourier is an error. Use eb_eta=0.1 for the paper odds.

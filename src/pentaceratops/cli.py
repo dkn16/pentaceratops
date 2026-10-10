@@ -12,7 +12,7 @@ def main(argv=None):
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("doctor", help="Report installed dependencies; no queries or downloads")
-    commands.add_parser("sampling-policy", help="Show provisional real-space sampling defaults")
+    commands.add_parser("sampling-policy", help="Show shared per-scenario sampling defaults")
     summary = commands.add_parser("inspect", help="Summarize a saved result bundle")
     summary.add_argument("path")
     evidence = commands.add_parser("evidence", help="Run evidence from prepared files and a JSON configuration")
