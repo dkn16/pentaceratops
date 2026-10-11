@@ -1,36 +1,15 @@
-"""
-Full-period Fourier-space FPP driver (isolated; does not modify triceratops_new.py
-or the time-domain marginal-likelihood files).
+"""Full-period Fourier FPP with a shared covariance for every scenario.
 
-Mirrors the scenario enumeration of `target.calc_probs` but scores every scenario in the
-Fourier domain on the WHOLE folded period (`flux_full`) with a per-frequency noise
-spectrum (`psd_folded`). Validated recipe (see kepler_injection/FourierLikelihood):
+When parity folds are supplied, their full-period data and PSDs define the
+likelihood for every host and scenario. P-period models use the exactly
+equivalent inverse-variance combined statistic; x2P models retain both parities.
+With no parity data, P-period models use the supplied full-period covariance.
+The same retained Fourier modes and aperture-frame flat reference are used
+throughout. A separate flat-secondary likelihood is not added.
 
-  * Model alignment: transit at index round(phase/dt); PyTransit centres it at t=0, so the
-    half-window grid is (arange(M)-M//2)*dt (eclipse-centred).
-  * TP scenarios: transit in the primary half + a FLAT secondary half (null-secondary
-    term, the Fourier analog of `_sec_lnL_correction`).
-  * EB scenarios: primary/secondary HALF-SPLIT, each half with its OWN ntransits and the
-    per-half PSD `psd_folded[1::2]/2`. All P-period scenarios share this representation, so
-    their evidences are comparable.
-
-Scenarios (target i==0): TP, EB, PTP, PEB, STP, SEB, DTP, DEB, BTP, BEB + the x2P
-even/odd variants (EBx2P..BEBx2P) when `flux_even_odd_full`/`ntransits_even`/`ntransits_odd`
-are given. Nearby stars (i>0): NTP, NEB, NEBx2P.   FPP = 1 - (P_TP + P_PTP + P_DTP).
-
-Comparability: every scenario enters the FPP softmax as its Bayes factor lnZ - lnZ_null
-(the star's flat-model Fourier evidence on the same windows). This makes the comparison
-invariant to the per-star dilution renorm -- the Gaussian-norm Jacobian 2K*log(fr) that
-renorm_fourier introduces cancels exactly -- and puts the half-split and even/odd
-representations on one scale.
-
-Usage:
-    from pentaceratops.fourier import calc_probs_fourier
-    df = calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
-                            ntransits, ntransits_secondary,
-                            flux_even_odd_full=..., ntransits_even=..., ntransits_odd=...,
-                            contrast_curve_file=..., filt="Kepler", molusc_file=...)
-`target` needs `.stars` (after calc_depths), `.mission`, and (for D/B) `.trilegal_fname`.
+weighting="legacy" explicitly reproduces the former independent half-period
+PSD approximation and scenario-dependent fold weights. It is for archived
+results only. timing_policy is independent of the covariance choice.
 """
 
 import numpy as np
@@ -137,12 +116,23 @@ def calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
                        trilegal_fname=None,
                        N=50, steps=20, nsamples=7, flatpriors=False,
                        eb_eta=1.0, drop_scenario=(), verbose=1,
-                       max_anomaly_shift=None, psd_even=None, psd_odd=None):
+                       max_anomaly_shift=None, psd_even=None, psd_odd=None,
+                       weighting="consistent", backend="optimized", timing_policy="legacy"):
     """Compute full-period Fourier-domain scenario evidences and FPP.
 
     Args mirror calc_probs where shared. `eb_eta` down-weights the EB-family occurrence
     prior (demographics; 1.0 = off). Returns a pandas.DataFrame (`.FPP`, `.NFPP` attrs).
+    With weighting="consistent" (default), parity fluxes and their PSDs define
+    the shared covariance; flux_full/psd_folded supply it only without parities.
+    ntransits_secondary is used only by weighting="legacy". The optimized and
+    scalar backends evaluate the same likelihood. This low-level entry point
+    retains legacy model timing unless timing_policy="observed" is requested;
+    the recorded package API defaults to observed timing.
     """
+    if weighting not in ("consistent", "legacy"):
+        raise ValueError("weighting must be consistent or legacy")
+    if backend not in ("optimized", "scalar") or timing_policy not in ("observed", "legacy"):
+        raise ValueError("Unknown Fourier backend or timing policy")
     stars = target.stars[target.stars["tdepth"] > 0].reset_index(drop=True)
     if len(stars) == 0:
         raise ValueError("no stars with tdepth > 0 -- run target.calc_depths first")
@@ -206,10 +196,34 @@ def calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
                           f"(max dev {dev:.2e} vs transit dip {dip:.2e}) -- x2P vs P-period "
                           f"evidences carry a data-inconsistency systematic", flush=True)
 
+    adapter = None
+    if weighting == "consistent":
+        from .likelihoods.folded_fourier import prepare_folded_metric
+        from .experimental.uniform_fourier import UniformFourierAdapter
+        metric = prepare_folded_metric(flux_full, psd_folded, phase, dt, P_orb, ntransits,
+            parity_flux=flux_even_odd_full, n_even=ntransits_even, n_odd=ntransits_odd,
+            psd_even=psd_even, psd_odd=psd_odd)
+        adapter = UniformFourierAdapter(metric, P_orb, phase, nsamples=nsamples,
+            mission=mission, filt=filt, timing_policy=timing_policy,
+            max_shift=max_anomaly_shift, backend=backend)
+
+    def _call(function, *args, **kwargs):
+        if adapter is not None:
+            return adapter.call(function, *args, **kwargs)
+        if timing_policy == "observed":
+            from .likelihoods.observed_fourier import observed_fourier_engine
+            with observed_fourier_engine():
+                return function(*args, **kwargs)
+        return function(*args, **kwargs)
+
     rows = []
     for i in range(len(stars)):
         ID = stars["ID"].values[i]
         fr = float(stars["fluxratio"].values[i])
+        if not np.isfinite(fr) or not 0 < fr <= 1:
+            raise ValueError("Eligible host fluxratio must be in (0, 1]")
+        if adapter is not None:
+            adapter.aperture_fraction = fr
         M_s = float(stars["mass"].values[i])
         R_s = float(stars["rad"].values[i])
         Teff = float(stars["Teff"].values[i])
@@ -219,18 +233,16 @@ def calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
                                   P_orb=P_orb)
         n_rows_star = len(rows)   # rows appended for THIS star get its null (see loop end)
 
-        # Per-star flat-model null on the half-split windows. Every scenario is
-        # null-referenced (lnBF = lnZ - null) before the softmax: the Bayes factor is
-        # renorm-frame-invariant (null - 2K*log(fr) is fr-independent), so this cancels
-        # the per-star dilution-renorm Jacobian 2K*log(fr) that would otherwise crush
-        # faint nearby stars, AND puts the half-split / even-odd representations on one
-        # scale. The data-dependent part of the null is LOAD-BEARING; do NOT reduce it
-        # to a norm-only constant. (Verified: see FourierLikelihood.)
+        # Consistent inference uses the same aperture-frame flat reference for
+        # every host and scenario. Only explicit archive weighting evaluates
+        # the former host-frame half-period reference and representation shift.
         null_hs = (null_window_lnL(w["prim"], w["var_pri"])
-                   + null_window_lnL(w["sec"], w["var_sec"]))
+                   + null_window_lnL(w["sec"], w["var_sec"])) if adapter is None else metric.null_loglike
+        secondary_null = null_secondary_lnL(w["sec"], w["var_sec"]) if adapter is None else 0.
 
-        # x2P (even/odd) prep + the representation shift (null_hs - null_eo): after it an
-        # x2P row's lnZ sits on the half-split scale, so lnZ - null_hs == lnZ_raw - null_eo.
+        # Recipe inputs remain available for priors/output compatibility.
+        # The consistent adapter scores its shared metric; the archive branch
+        # alone applies a representation-dependent null shift.
         do_x2p = (flux_even_odd_full is not None
                   and ntransits_even is not None and ntransits_odd is not None)
         if do_x2p:
@@ -242,7 +254,7 @@ def calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
                 psd_even=psd_even_s, psd_odd=psd_odd_s)
             null_eo = (null_window_lnL(weo["even"], weo["var_even"])
                        + null_window_lnL(weo["odd"], weo["var_odd"]))
-            x2p_shift = null_hs - null_eo
+            x2p_shift = null_hs - null_eo if adapter is None else 0.
 
         def _x2p(fn, label, star_num, extra, **kw):
             """Dispatch one x2P (even/odd) scenario with the comparability shift."""
@@ -252,7 +264,7 @@ def calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
                 rows.append(dict(ID=ID, scenario=label, star_num=star_num,
                                  lnZ=-np.inf, R_p=np.nan, eta=eb_eta))
                 return
-            res = fn(weo["t_eo"], weo["even"], sig, weo["var_even"],
+            res = _call(fn, weo["t_eo"], weo["even"], sig, weo["var_even"],
                      weo["t_eo"], weo["odd"], sig, weo["var_odd"], *extra,
                      N=N, steps=steps, mission=mission, flatpriors=flatpriors,
                      exptime=dt, nsamples=nsamples,
@@ -274,18 +286,18 @@ def calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
             if "TP" in drop_scenario:
                 rows.append(dict(ID=ID, scenario="TP", star_num=1, lnZ=-np.inf, R_p=np.nan, eta=1.0))
             else:
-                res = _MF.lnZ_TTP_fourier(
+                res = _call(_MF.lnZ_TTP_fourier,
                     w["t_pri"], w["prim"], sig, w["var_pri"], P_orb, M_s, R_s, Teff, Z,
                     N=N, steps=steps, mission=mission, flatpriors=flatpriors,
                     exptime=dt, nsamples=nsamples)
-                lnZ_TP = res["lnZ"] + null_secondary_lnL(w["sec"], w["var_sec"])
+                lnZ_TP = res["lnZ"] + secondary_null
                 rows.append(dict(ID=ID, scenario="TP", star_num=1, lnZ=lnZ_TP,
                                  R_p=res["R_p"][0], eta=1.0))
 
             if "EB" in drop_scenario:
                 rows.append(dict(ID=ID, scenario="EB", star_num=1, lnZ=-np.inf, R_p=np.nan, eta=eb_eta))
             else:
-                res = _MEF.lnZ_TEB_secondary_fourier(
+                res = _call(_MEF.lnZ_TEB_secondary_fourier,
                     w["t_pri"], w["prim"], sig, w["var_pri"],
                     w["t_sec"], w["sec"], sig, w["var_sec"],
                     P_orb, M_s, R_s, Teff, Z,
@@ -297,19 +309,19 @@ def calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
             if "PTP" in drop_scenario:
                 rows.append(dict(ID=ID, scenario="PTP", star_num=1, lnZ=-np.inf, R_p=np.nan, eta=1.0))
             else:
-                res = _MF.lnZ_PTP_fourier(
+                res = _call(_MF.lnZ_PTP_fourier,
                     w["t_pri"], w["prim"], sig, w["var_pri"], P_orb, M_s, R_s, Teff, Z,
                     plx, contrast_curve_file, filt,
                     N=N, steps=steps, mission=mission, flatpriors=flatpriors,
                     exptime=dt, nsamples=nsamples, molusc_file=molusc_file)
-                lnZ_PTP = res["lnZ"] + null_secondary_lnL(w["sec"], w["var_sec"])
+                lnZ_PTP = res["lnZ"] + secondary_null
                 rows.append(dict(ID=ID, scenario="PTP", star_num=1, lnZ=lnZ_PTP,
                                  R_p=res["R_p"][0], eta=1.0))
 
             if "PEB" in drop_scenario:
                 rows.append(dict(ID=ID, scenario="PEB", star_num=1, lnZ=-np.inf, R_p=np.nan, eta=eb_eta))
             else:
-                res = _MEF.lnZ_PEB_secondary_fourier(
+                res = _call(_MEF.lnZ_PEB_secondary_fourier,
                     w["t_pri"], w["prim"], sig, w["var_pri"],
                     w["t_sec"], w["sec"], sig, w["var_sec"],
                     P_orb, M_s, R_s, Teff, Z,
@@ -323,19 +335,19 @@ def calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
             if "STP" in drop_scenario:
                 rows.append(dict(ID=ID, scenario="STP", star_num=2, lnZ=-np.inf, R_p=np.nan, eta=1.0))
             else:
-                res = _MF.lnZ_STP_fourier(
+                res = _call(_MF.lnZ_STP_fourier,
                     w["t_pri"], w["prim"], sig, w["var_pri"], P_orb, M_s, R_s, Teff, Z,
                     plx, contrast_curve_file, filt,
                     N=N, steps=steps, mission=mission, flatpriors=flatpriors,
                     exptime=dt, nsamples=nsamples, molusc_file=molusc_file)
-                lnZ_STP = res["lnZ"] + null_secondary_lnL(w["sec"], w["var_sec"])
+                lnZ_STP = res["lnZ"] + secondary_null
                 rows.append(dict(ID=ID, scenario="STP", star_num=2, lnZ=lnZ_STP,
                                  R_p=res["R_p"][0], eta=1.0))
 
             if "SEB" in drop_scenario:
                 rows.append(dict(ID=ID, scenario="SEB", star_num=2, lnZ=-np.inf, R_p=np.nan, eta=eb_eta))
             else:
-                res = _MEF.lnZ_SEB_secondary_fourier(
+                res = _call(_MEF.lnZ_SEB_secondary_fourier,
                     w["t_pri"], w["prim"], sig, w["var_pri"],
                     w["t_sec"], w["sec"], sig, w["var_sec"],
                     P_orb, M_s, R_s, Teff, Z,
@@ -349,19 +361,19 @@ def calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
             if "DTP" in drop_scenario:
                 rows.append(dict(ID=ID, scenario="DTP", star_num=1, lnZ=-np.inf, R_p=np.nan, eta=1.0))
             else:
-                res = _MF.lnZ_DTP_fourier(
+                res = _call(_MF.lnZ_DTP_fourier,
                     w["t_pri"], w["prim"], sig, w["var_pri"], P_orb, M_s, R_s, Teff, Z,
                     Tmag, Jmag, Hmag, Kmag, trilegal_fname, contrast_curve_file, filt,
                     N=N, steps=steps, mission=mission, flatpriors=flatpriors,
                     exptime=dt, nsamples=nsamples)
-                lnZ_DTP = res["lnZ"] + null_secondary_lnL(w["sec"], w["var_sec"])
+                lnZ_DTP = res["lnZ"] + secondary_null
                 rows.append(dict(ID=ID, scenario="DTP", star_num=1, lnZ=lnZ_DTP,
                                  R_p=res["R_p"][0], eta=1.0))
 
             if "DEB" in drop_scenario:
                 rows.append(dict(ID=ID, scenario="DEB", star_num=1, lnZ=-np.inf, R_p=np.nan, eta=eb_eta))
             else:
-                res = _MEF.lnZ_DEB_secondary_fourier(
+                res = _call(_MEF.lnZ_DEB_secondary_fourier,
                     w["t_pri"], w["prim"], sig, w["var_pri"],
                     w["t_sec"], w["sec"], sig, w["var_sec"],
                     P_orb, M_s, R_s, Teff, Z,
@@ -374,19 +386,19 @@ def calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
             if "BTP" in drop_scenario:
                 rows.append(dict(ID=ID, scenario="BTP", star_num=2, lnZ=-np.inf, R_p=np.nan, eta=1.0))
             else:
-                res = _MF.lnZ_BTP_fourier(
+                res = _call(_MF.lnZ_BTP_fourier,
                     w["t_pri"], w["prim"], sig, w["var_pri"], P_orb, M_s, R_s, Teff,
                     Tmag, Jmag, Hmag, Kmag, trilegal_fname, contrast_curve_file, filt,
                     N=N, steps=steps, mission=mission, flatpriors=flatpriors,
                     exptime=dt, nsamples=nsamples)
-                lnZ_BTP = res["lnZ"] + null_secondary_lnL(w["sec"], w["var_sec"])
+                lnZ_BTP = res["lnZ"] + secondary_null
                 rows.append(dict(ID=ID, scenario="BTP", star_num=2, lnZ=lnZ_BTP,
                                  R_p=res["R_p"][0], eta=1.0))
 
             if "BEB" in drop_scenario:
                 rows.append(dict(ID=ID, scenario="BEB", star_num=2, lnZ=-np.inf, R_p=np.nan, eta=eb_eta))
             else:
-                res = _MEF.lnZ_BEB_secondary_fourier(
+                res = _call(_MEF.lnZ_BEB_secondary_fourier,
                     w["t_pri"], w["prim"], sig, w["var_pri"],
                     w["t_sec"], w["sec"], sig, w["var_sec"],
                     P_orb, M_s, R_s, Teff,
@@ -420,18 +432,18 @@ def calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
             if "NTP" in drop_scenario:
                 rows.append(dict(ID=ID, scenario="NTP", star_num=1, lnZ=-np.inf, R_p=np.nan, eta=1.0))
             else:
-                res = _MF.lnZ_TTP_fourier(
+                res = _call(_MF.lnZ_TTP_fourier,
                     w["t_pri"], w["prim"], sig, w["var_pri"], P_orb, M_s, R_s, Teff, Z,
                     N=N, steps=steps, mission=mission, flatpriors=flatpriors,
                     exptime=dt, nsamples=nsamples)
-                lnZ_NTP = res["lnZ"] + null_secondary_lnL(w["sec"], w["var_sec"])
+                lnZ_NTP = res["lnZ"] + secondary_null
                 rows.append(dict(ID=ID, scenario="NTP", star_num=1, lnZ=lnZ_NTP,
                                  R_p=res["R_p"][0], eta=1.0))
 
             if "NEB" in drop_scenario:
                 rows.append(dict(ID=ID, scenario="NEB", star_num=1, lnZ=-np.inf, R_p=np.nan, eta=eb_eta))
             else:
-                res = _MEF.lnZ_TEB_secondary_fourier(
+                res = _call(_MEF.lnZ_TEB_secondary_fourier,
                     w["t_pri"], w["prim"], sig, w["var_pri"],
                     w["t_sec"], w["sec"], sig, w["var_sec"],
                     P_orb, M_s, R_s, Teff, Z,
@@ -445,6 +457,15 @@ def calc_probs_fourier(target, P_orb, flux_full, psd_folded, phase, dt,
             r["null"] = null_hs
 
     df = pd.DataFrame(rows)
+    df.attrs.update(weighting=weighting, timing_policy=timing_policy,
+                    backend=backend if adapter is not None else "scalar")
+    if adapter is not None:
+        df.attrs["noise_model"] = dict(
+            representation="full_period_parities" if len(metric.blocks) == 2 else "full_period",
+            compression="inverse_variance_sufficient_statistic_for_P_models",
+            mode_policy="drop_DC_and_real_Nyquist", aperture_frame=True,
+            time=[b.time.copy() for b in metric.blocks], flux=[b.flux.copy() for b in metric.blocks],
+            variance=[b.variance.copy() for b in metric.blocks], null_loglike=metric.null_loglike)
     if df["lnZ"].isna().any():
         bad = df.loc[df["lnZ"].isna(), "scenario"].tolist()
         print(f"  WARNING: NaN lnZ for scenarios {bad} -- treated as -inf (excluded from "
@@ -482,7 +503,7 @@ def calc_probs_joint_fourier(*args, **kwargs):
     """Opt-in joint Fourier inference on observed samples, preserving gaps and 2P.
 
     See :func:`pentaceratops.evidence.joint_fourier.calc_probs_joint_fourier`.
-    The existing half-split calc_probs_fourier entry point is unchanged.
+    The uniform calc_probs_fourier entry point also uses consistent scenario weights.
     """
     from .evidence.joint_fourier import calc_probs_joint_fourier as joint
     return joint(*args, **kwargs)

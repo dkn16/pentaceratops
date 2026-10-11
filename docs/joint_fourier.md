@@ -128,8 +128,10 @@ versus scalar calculations, real sampler pool/replay integration, and sector
 preparation/serialization. These are numerical correctness tests, not a claim
 of posterior convergence or empirical PSD calibration on a particular target.
 
-The existing `calc_probs_fourier` API and frozen HZ comparison remain unchanged.
-New HZ results must use a separately frozen campaign and a distinct method name.
+The uniform-array `calc_probs_fourier` API now also shares covariance weights
+across scenarios; see [Fourier weighting](fourier_weighting.md). Frozen HZ
+results are unchanged and require explicit legacy weighting for reproduction.
+New HZ results use a separately frozen campaign.
 
 ## Full-orbit folding
 

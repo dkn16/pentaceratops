@@ -157,7 +157,7 @@ def test_recorded_fourier_selects_and_restores_policy(monkeypatch, tmp_path):
     legacy = calc_probs_fourier(timing_policy="legacy", max_anomaly_shift=.3)
     assert legacy.metadata["max_anomaly_shift"] == .3
     assert observed_calls == [True, False]
-    def broken():
+    def broken(**kwargs):
         assert evidence.lnL_EB_second_fourier is lnL_EB_second_observed
         raise RuntimeError("sampling failed")
     monkeypatch.setattr(driver, "calc_probs_fourier", broken)

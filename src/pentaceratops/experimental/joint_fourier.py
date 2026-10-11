@@ -30,7 +30,7 @@ class JointFourierAdapter:
             raise ValueError("mission must be TESS, Kepler, or K2")
         self.mission = mission
         self.filt = ("TESS" if mission == "TESS" else "Kepler") if filt is None else filt
-        self.metric = JointFourierMetric(blocks)
+        self.metric = blocks if isinstance(blocks, JointFourierMetric) else JointFourierMetric(blocks)
         exposures = np.array([b.exptime for b in self.metric.blocks])
         if not np.allclose(exposures, exposures[0], atol=0, rtol=1e-12):
             raise ValueError("This adapter requires a common exposure duration")
@@ -149,6 +149,10 @@ class JointFourierAdapter:
             companion_is_host=companion_is_host, exptime=exptime, nsamples=nsamples)
         return self._scalar("x2p", p)
 
+    def _mask_projected_component(self, kind, values, secondary, reverse):
+        """Full-orbit components by default; archive adapters can restrict them."""
+        return values
+
     def _project(self, kind, p, *, reverse=False):
         self._check(kind, p)
         start = time.perf_counter()
@@ -170,7 +174,7 @@ class JointFourierAdapter:
             coeff, windows = orbit_setup(pars)
             value, counts = project_strict(pars, coeff, windows, self.native_time, phase, order,
                 self.identity, self.weights, len(self.native_time), self.exptime, self.nsamples)
-            signal += value
+            signal += self._mask_projected_component(kind, value, secondary, reverse)
             self.profile["native_evaluations"] += int(counts.sum())
         self.profile["exposure_seconds"] += time.perf_counter()-start
         return 1+signal

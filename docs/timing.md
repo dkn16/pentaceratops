@@ -56,11 +56,13 @@ remains free of an extra local timing cutoff. Missing phase bins remain absent.
 
 The recorded full-P/2P array interface `pentaceratops.calc_probs_fourier` now
 also uses complete orbital EB predictions by default. Both eclipses are
-evaluated on each fitted half/parity grid. This matters for eccentric systems:
+evaluated on the complete parity grids. This matters for eccentric systems:
 simply removing the old timing bound could otherwise leave an eclipse outside
 the half in which the old renderer placed it, losing an observable feature.
-The retained FFT bins, PSD conventions, null normalization, scalar sampler,
-physical priors and maximum-over-parity choice are preserved.
+Consistent weighting uses one common covariance for all scenarios and the
+optimized sampler. Repeating models use the inverse-variance combined parity
+statistic. Physical priors, retained FFT modes and maximum-over-parity choice
+are preserved; see [Fourier weighting](fourier_weighting.md).
 
 ```python
 from pentaceratops import calc_probs_fourier
@@ -78,16 +80,18 @@ scientific assumption.
 
 ## Reproducing archived results
 
-Use explicit reproduction settings when checking adopted paper results:
+Use explicit reproduction settings when checking archived paper runs:
 
 ```python
 real = calc_probs_folded_real(target, prepared_real, timing_policy="legacy",
                              eb_eta=0.1, **original_real_settings)
-fourier = calc_probs_fourier(target, timing_policy="legacy",
+fourier = calc_probs_fourier(target, timing_policy="legacy", weighting="legacy",
                             **original_fourier_arguments)
 ```
 
 Here `original_fourier_arguments` includes the saved timing limit, if present.
+The adopted TOI-700.04 covariance rerun keeps `timing_policy="legacy"` and that
+bound, but uses `weighting="consistent"`; see [the adopted HZ settings](hz_runs.md).
 The checked TESS matched and Kepler completion campaigns both used three
 catalogue transit durations. Legacy mode retains the original center-only
 x2P guard and Fourier model placement. The Real synthetic-secondary treatment

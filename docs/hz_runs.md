@@ -37,16 +37,19 @@ a new PSD. Reusing the paper's inputs therefore preserves those decisions.
 | --- | --- | --- |
 | `calc_probs_folded_real` | Folded even/odd/secondary conditional means; `diag(sigma**2) + F F.T`, including covariance between panels | Optimized fixed-period physical models; exposure integration; original physical priors |
 | `calc_probs_folded_fourier` | Complete observed orbit folded at 2P; `sum_s A_s C_s A_s.T`; empty bins omitted | The same A applied to native exposure predictions; optimized models retain alternating eclipses |
-| `calc_probs_fourier` | Full-P/2P Fourier input arrays and PSD conventions | Scalar sampler and complete orbital eclipse models; explicit legacy mode for reproduction |
+| `calc_probs_fourier` | Shared full-period parity covariance; exact inverse-variance compression for P models | Optimized sampler and complete orbital eclipse models; explicit legacy weighting/timing for reproduction |
 | `run_folded_baseline` | A prepared P or 2P Gaussian block with the selected transits/covariance | Original Fourier physical grids, scalar sampler, timing limits, and parity policy |
 
 The original folded Fourier implementation is shared by **TESS and Kepler**.
-Six of the seven adopted TESS results used the implementation now preserved by
-`calc_probs_fourier(..., timing_policy="legacy")`: TOI-700.02,
-700.04, 715.01, 904.02, 2257.01, and 6714.01. TOI-7390.01 uses the later
-full-orbit folding operator and propagated covariance. The original path is
-therefore a supported paper workflow for both missions, not a Kepler-only
-fallback. The archived matched TESS and Kepler completion campaigns both
+Five of the seven adopted TESS results use the implementation preserved by
+`calc_probs_fourier(..., timing_policy="legacy", weighting="legacy")`: TOI-700.02,
+715.01, 904.02, 2257.01, and 6714.01. The adopted TOI-700.04 rerun instead uses
+`weighting="consistent", timing_policy="legacy", backend="optimized"`, retaining
+its saved timing bound while applying the same full-period parity covariance
+to all 33 scenarios. At `eb_eta=0.1`, it gives FPP 0.19121520666242298 and EB-only
+probability 0.15615135472354452. TOI-7390.01 uses the full-orbit folding operator
+and propagated covariance. The original path remains available for reproducing
+the earlier TESS and Kepler results. The archived matched completion campaigns both
 used `max_anomaly_shift = 3 * duration`. The adopted KOI-2719.02 record confirms
 0.4177313703647727 days = 3 times its 0.1392437901215909-day duration.
 An earlier description of a four-duration Kepler cutoff was incorrect.

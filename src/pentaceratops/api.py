@@ -1,7 +1,8 @@
 """Recorded compatibility API for the extracted research engine.
 
-This layer deliberately does not change likelihood-frame conventions, masks,
-PSDs or dilution. Benchmark-specific orchestration is not yet a turnkey API.
+Public runs retain complete sampler records and explicit inference settings.
+The uniform Fourier driver defaults to consistent shared covariance weights;
+archived half-period weighting requires an explicit reproduction option.
 """
 
 from contextlib import contextmanager
@@ -75,8 +76,10 @@ def calc_probs_fourier(*args, output_path=None, seed=None, timing_policy="observ
     Numerical arguments follow ``pentaceratops.fourier.calc_probs_fourier``.
     The default renders both eclipses on every full-period grid, without a
     duration-based timing cut. ``timing_policy="legacy"`` preserves the archived
-    renderer and accepts its explicit max_anomaly_shift. The resulting table
-    has null-referenced lnBF and records the selected timing policy.
+    renderer and accepts its explicit max_anomaly_shift. weighting="consistent"
+    uses a common full-period noise model and optimized sampler by default;
+    archive reproduction also requires weighting="legacy". The resulting table
+    has null-referenced lnBF and records both policies.
     """
     import inspect
     from contextlib import nullcontext
@@ -86,6 +89,7 @@ def calc_probs_fourier(*args, output_path=None, seed=None, timing_policy="observ
         RunResult.check_destination(output_path)
     if timing_policy not in ("observed", "legacy"):
         raise ValueError("timing_policy must be observed or legacy")
+    kwargs["timing_policy"] = timing_policy
     bound = inspect.signature(calculate).bind(*args, **kwargs)
     limit = bound.arguments.get("max_anomaly_shift")
     if timing_policy == "observed" and limit is not None:
@@ -93,7 +97,8 @@ def calc_probs_fourier(*args, output_path=None, seed=None, timing_policy="observ
     context = observed_fourier_engine() if timing_policy == "observed" else nullcontext()
     with context:
         result = run_evidence(calculate, *args, seed=seed,
-                              metadata=dict(timing_policy=timing_policy, max_anomaly_shift=limit), **kwargs)
+                              metadata=dict(timing_policy=timing_policy, max_anomaly_shift=limit,
+                                            weighting=kwargs.get("weighting", "consistent")), **kwargs)
     result.output.attrs["timing_policy"] = timing_policy
     result.output.attrs["max_anomaly_shift"] = limit
     if output_path is not None:

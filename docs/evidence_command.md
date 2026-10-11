@@ -143,7 +143,7 @@ For a directory saved by `FoldedFourierData.save`:
 
 Set `"likelihood": "fourier"` as well. This interface uses the full-orbit
 folding operator. Original half-grid Fourier archive recipes remain available
-through `run_folded_baseline` or `calc_probs_fourier(..., timing_policy="legacy")`;
+through `run_folded_baseline` or `calc_probs_fourier(..., timing_policy="legacy", weighting="legacy")`;
 the command does not reinterpret those archives as full-orbit inputs.
 
 ## Settings and records

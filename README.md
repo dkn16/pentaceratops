@@ -4,7 +4,7 @@ Statistical validation of transiting planet candidates using competing planet
 and eclipsing-binary scenarios, real-space or Fourier-space likelihoods, and
 persistent sampling.
 
-**Development version: `0.1.0.dev13`.** Run evidence directly from Python:
+**Development version: `0.1.0.dev14`.** Run evidence directly from Python:
 
 ```python
 from pentaceratops import prepare_target
@@ -154,7 +154,9 @@ python -m pentaceratops inspect /path/to/scratch/target_tp.npz
 
 The recorded compatibility interfaces `Target.calc_probs(...)` and
 `calc_probs_fourier(...)` also return `RunResult`, with a scenario table in
-`.output`. The real-space compatibility interface warns about the missing
+`.output`. Uniform Fourier runs use one covariance across scenario families,
+with inverse-variance combination of parity folds for repeating models; see
+[Fourier weighting](docs/fourier_weighting.md). The real-space compatibility interface warns about the missing
 benchmark orchestration. Details: [results and posterior records](docs/results.md).
 
 ## From evidence to false-positive probability
