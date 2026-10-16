@@ -186,7 +186,7 @@ def binary_eccentricity_ppf(u, P_orb):
     if BINARY_ECC != "moe2017":
         raise ValueError(f"Unknown PENTACERATOPS_BINARY_ECC={BINARY_ECC!r}")
     logp = np.log10(np.maximum(P, 1e-9))
-    with np.errstate(divide="ignore", invalid="ignore"):
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
         eta = 0.6 - 0.7 / (logp - 0.5)
         e_max = np.where(P > 2, 1 - (P / 2)**(-2 / 3), 0.)
         e = e_max * u**(1 / (eta + 1))
