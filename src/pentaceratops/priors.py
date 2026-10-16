@@ -150,8 +150,7 @@ def sample_ecc(x, planet, P_orb):
     if planet:
         return (_beta.ppf(u, 0.867, 3.030))
     else:
-        a_shape = 0.2 if P_orb <= 10 else 0.6
-        return (_powerlaw.ppf(u, a_shape))
+        return binary_eccentricity_ppf(u, P_orb)
     size = len(x)
     if planet == True:
         x = beta.rvs(0.867, 3.030, size=size)
@@ -162,6 +161,53 @@ def sample_ecc(x, planet, P_orb):
         else:
             x = powerlaw.rvs(0.6, size=size)
     return x
+
+import os as _os
+# "moe2017" (default on this branch) or "legacy" (u**(1/a), a=0.2 if P<=10 d else 0.6).
+BINARY_ECC = _os.environ.get("PENTACERATOPS_BINARY_ECC", "moe2017")
+
+
+def binary_eccentricity_ppf(u, P_orb):
+    """Inverse CDF of the binary eccentricity prior.
+
+    moe2017 (Moe & Di Stefano 2017, ApJS 230, 15, eqs. 3 and 17, solar-type primaries):
+    p(e) ~ e^eta on 0 <= e <= e_max(P), eta = 0.6 - 0.7/(log10 P - 0.5),
+    e_max = 1 - (P / 2 d)^(-2/3); circular for P <= 2 d and wherever eta <= -1
+    (log10 P <= 0.9375, P <~ 8.7 d), where the power law is not normalisable
+    (same convention as Dyad's moe2017 implementation). P is the period passed by
+    the caller (the existing base-period convention of every scenario).
+    legacy: the previous u**(1/a) law with a = 0.2 (P <= 10 d) or 0.6.
+    """
+    u = np.clip(np.asarray(u, dtype=float), 1e-12, 1 - 1e-12)
+    P = np.broadcast_to(np.asarray(P_orb, dtype=float), u.shape)
+    if BINARY_ECC == "legacy":
+        a_shape = np.where(P <= 10, 0.2, 0.6)
+        return u**(1 / a_shape)
+    if BINARY_ECC != "moe2017":
+        raise ValueError(f"Unknown PENTACERATOPS_BINARY_ECC={BINARY_ECC!r}")
+    logp = np.log10(np.maximum(P, 1e-9))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        eta = 0.6 - 0.7 / (logp - 0.5)
+        e_max = np.where(P > 2, 1 - (P / 2)**(-2 / 3), 0.)
+        e = e_max * u**(1 / (eta + 1))
+    circular = (P <= 2) | (logp <= 0.5) | (eta <= -0.999)
+    return np.where(circular, 0., e)
+
+
+def binary_eccentricity_logpdf(e, P_orb):
+    """log p(e) of binary_eccentricity_ppf's distribution (for reweighting checks); -inf outside support."""
+    e = np.asarray(e, dtype=float)
+    P = np.broadcast_to(np.asarray(P_orb, dtype=float), e.shape)
+    if BINARY_ECC == "legacy":
+        a = np.where(P <= 10, 0.2, 0.6)
+        return np.log(a) + (a - 1) * np.log(np.clip(e, 1e-300, None))
+    logp = np.log10(np.maximum(P, 1e-9))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        eta = 0.6 - 0.7 / (logp - 0.5)
+        e_max = np.where(P > 2, 1 - (P / 2)**(-2 / 3), 0.)
+        lp = np.log(eta + 1) - (eta + 1) * np.log(e_max) + eta * np.log(np.clip(e, 1e-300, None))
+    return np.where((e >= 0) & (e <= e_max) & (eta > -0.999), lp, -np.inf)
+
 
 def sample_w(x):
     """
@@ -174,7 +220,7 @@ def sample_w(x):
     x = x*360
     return x
 
-def sample_q(x, M_s):
+def _sample_q_stellar(x, M_s):
     """
     Samples mass ratios of short-period binaries.
     Args:
@@ -283,7 +329,7 @@ def sample_q(x, M_s):
     return x
 
 
-def sample_q_companion(x, M_s):
+def _sample_q_companion_stellar(x, M_s):
     """
     Samples mass ratios of long-period companions.
     Args:
@@ -390,6 +436,79 @@ def sample_q_companion(x, M_s):
     elif M_s <= 0.1:
         x = np.full(len(x), 1.0)
     return x
+
+
+# ----------------------------------------------------------------------------------------------
+# Companions below the stellar mass-ratio prior's floor (M_comp = max(0.1, 0.1 M_s) Msun):
+# very-low-mass stars down to the hydrogen-burning limit, and brown dwarfs down to 13 M_J.
+#   * stellar part: the previous distribution, unchanged in shape;
+#   * VLM stars, 0.075 Msun up to the floor: the existing low-q power law continued below the floor
+#     with the same density at the floor (gamma_smallq = 0.3 for M_s >= 0.3, else the p2 slope);
+#   * brown dwarfs, 13 M_J - 0.075 Msun: flat in log mass, total weight F_BD_REL relative to the
+#     stellar part. F_BD_REL = 0.05 ~ (short-period BD frequency 0.24 +- 0.04 %, Kiefer et al. 2019;
+#     0.2-0.3 % CoRoT transiting BDs, Csizmadia 2016) / (stellar companions q > 0.1 per decade
+#     2.7 +- 0.9 % at log P = 0.5-1.5 over ~1.9 decades, Moe & Di Stefano 2017).
+# The returned q are drawn from the normalised mixture; lowmass_rate_factor(M_s) gives the
+# relative total rate (1 + VLM + BD weight) so a caller can treat the added companions as extra
+# prior rate rather than redistributed mass. PENTACERATOPS_LOWMASS=0 restores the previous priors.
+LOWMASS_ENABLED = _os.environ.get("PENTACERATOPS_LOWMASS", "1") != "0"
+M_HBURN = 0.075
+M_BD_MIN = 13 * 9.5458e-4          # 13 Jupiter masses in Msun
+F_BD_REL = float(_os.environ.get("PENTACERATOPS_F_BD_REL", "0.05"))
+
+
+def _lowmass_segments(M_s, stellar_ppf, low_slope):
+    """Weights and bounds of the BD / VLM / stellar mixture for a scalar primary mass."""
+    q_floor = float(stellar_ppf(np.array([0.0]), M_s)[0])
+    eps = 1e-7
+    density_floor = eps / (float(stellar_ppf(np.array([eps]), M_s)[0]) - q_floor)
+    q_h = min(M_HBURN / M_s, q_floor)
+    s1 = low_slope + 1
+    m_vlm = density_floor * q_floor / s1 * (1 - (q_h / q_floor)**s1) if q_h < q_floor else 0.
+    q_bd_hi = min(M_HBURN / M_s, q_floor)
+    q_bd_lo = M_BD_MIN / M_s
+    m_bd = F_BD_REL if q_bd_lo < q_bd_hi else 0.
+    return dict(q_floor=q_floor, density_floor=density_floor, q_h=q_h, slope=low_slope,
+                m_vlm=m_vlm, m_bd=m_bd, q_bd=(q_bd_lo, q_bd_hi), total=1 + m_vlm + m_bd)
+
+
+def _sample_q_lowmass(x, M_s, stellar_ppf, low_slope):
+    x = np.array(x, dtype=float, copy=True)
+    if not LOWMASS_ENABLED or np.ndim(M_s) or M_s <= 0.1:
+        return stellar_ppf(x, M_s)
+    seg = _lowmass_segments(M_s, stellar_ppf, low_slope)
+    w_bd, w_vlm = seg['m_bd'] / seg['total'], seg['m_vlm'] / seg['total']
+    out = np.empty_like(x)
+    bd = x < w_bd
+    vlm = (x >= w_bd) & (x < w_bd + w_vlm)
+    st = ~(bd | vlm)
+    lo, hi = seg['q_bd']
+    out[bd] = lo * (hi / lo)**(x[bd] / w_bd) if w_bd > 0 else lo
+    if vlm.any():
+        mass = (x[vlm] - w_bd) * seg['total']              # cumulative VLM mass from q_h
+        s1, qf = seg['slope'] + 1, seg['q_floor']
+        out[vlm] = qf * ((seg['q_h'] / qf)**s1 + mass * s1 / (seg['density_floor'] * qf))**(1 / s1)
+    out[st] = stellar_ppf(np.clip((x[st] - w_bd - w_vlm) / (1 - w_bd - w_vlm), 0, 1), M_s)
+    return out
+
+
+def sample_q(x, M_s):
+    """Mass ratios of short-period binaries: stellar prior extended to VLM stars and brown dwarfs."""
+    return _sample_q_lowmass(x, M_s, _sample_q_stellar, 0.3 if (not np.ndim(M_s) and M_s >= 0.3) else -0.5)
+
+
+def sample_q_companion(x, M_s):
+    """Mass ratios of long-period companions: stellar prior extended to VLM stars and brown dwarfs."""
+    return _sample_q_lowmass(x, M_s, _sample_q_companion_stellar,
+                             0.3 if (not np.ndim(M_s) and M_s >= 0.3) else -0.95)
+
+
+def lowmass_rate_factor(M_s, companion=False):
+    """Relative total companion rate (stellar part = 1) implied by the low-mass extension."""
+    if not LOWMASS_ENABLED or M_s <= 0.1:
+        return 1.0
+    ppf, slope = ((_sample_q_companion_stellar, -0.95) if companion else (_sample_q_stellar, -0.5))
+    return _lowmass_segments(M_s, ppf, 0.3 if M_s >= 0.3 else slope)['total']
 
 
 def lnprior_Mstar_planet(M_s: np.array):

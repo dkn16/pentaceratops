@@ -11,7 +11,7 @@ from typing import Callable
 import numpy as np
 from scipy.special import betaincinv
 
-from ..priors import sample_inc, sample_w
+from ..priors import sample_inc, sample_w, binary_eccentricity_ppf
 
 
 @dataclass(frozen=True, eq=False)
@@ -48,7 +48,7 @@ class ScenarioPrior:
         out[:, 2] = (
             betaincinv(0.867, 3.030, ue)
             if self.model.system.kind == "planet"
-            else ue ** (1 / np.where(out[:, 0] <= 10, 0.2, 0.6))
+            else binary_eccentricity_ppf(ue, out[:, 0])
         )
         out[:, 3] = sample_w(u[:, 3].copy())
         host = self.model.host

@@ -173,8 +173,8 @@ def _inv_sample_ecc_vec(u_arr, planet: bool, P_orb: float):
     u_arr = np.clip(np.asarray(u_arr, dtype=float), 1e-12, 1.0 - 1e-12)
     if planet:
         return np.asarray(_beta.ppf(u_arr, 0.867, 3.030), dtype=float)
-    a_shape = 0.6 if P_orb > 10 else 0.2
-    return np.asarray(_powerlaw.ppf(u_arr, a_shape), dtype=float)
+    from ..priors import binary_eccentricity_ppf
+    return np.asarray(binary_eccentricity_ppf(u_arr, P_orb), dtype=float)
 
 
 def _inv_sample_ecc(u: float, planet: bool, P_orb: float) -> float:

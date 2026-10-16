@@ -158,12 +158,12 @@ def _inv_sample_ecc(u: float, planet: bool, P_orb: float) -> float:
     from scipy.stats import beta as _beta
     from scipy.stats import powerlaw as _powerlaw
 
+    from ..priors import binary_eccentricity_ppf
     u = np.clip(u, 1e-12, 1-1e-12)
     if planet:
         return float(_beta.ppf(u, 0.867, 3.030))
     else:
-        a_shape = 0.2 if P_orb <= 10 else 0.6
-        return float(_powerlaw.ppf(u, a_shape))
+        return float(binary_eccentricity_ppf(np.array([u]), P_orb)[0])
 
 def lnZ_TTP(time: np.ndarray, flux: np.ndarray, sigma: float,
             P_orb: float, M_s: float, R_s: float, Teff: float,

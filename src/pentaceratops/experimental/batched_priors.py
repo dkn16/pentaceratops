@@ -17,7 +17,8 @@ def eccentricity(u, planet, period):
     u = np.clip(u, 1e-12, 1-1e-12)
     if planet:
         return betaincinv(.867, 3.030, u)
-    return u**(1/np.where(np.asarray(period) <= 10, .2, .6))
+    from ..priors import binary_eccentricity_ppf
+    return binary_eccentricity_ppf(u, period)
 
 
 def population_index(u, size):

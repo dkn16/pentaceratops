@@ -134,6 +134,34 @@ Rad_spline_cdwrf = InterpolatedUnivariateSpline(
     Mass_nodes_cdwrf, Rad_nodes_cdwrf
     )
 
+# Companions below 0.1 Msun (very-low-mass stars and brown dwarfs). The relations above are
+# only defined from 0.1 Msun; below it, radius and Teff come from a ~5 Gyr table (ATMO 2020
+# below 0.075 Msun, BHAC15 for 0.075-0.10 Msun) and band fluxes are scaled from the existing
+# relation at 0.1 Msun by R^2 x blackbody band flux. PENTACERATOPS_LOWMASS=0 restores the
+# previous clamped behaviour exactly.
+import os as _os
+LOWMASS_ENABLED = _os.environ.get("PENTACERATOPS_LOWMASS", "1") != "0"
+LOWMASS_FLOOR = 0.1
+_lowmass = read_csv(_os.path.join(_os.path.dirname(__file__), "data", "lowmass_relations_5gyr.csv"), comment="#")
+_lowmass_logm = np.log10(np.asarray(_lowmass["mass"], float))
+_lowmass_logr = np.log10(np.asarray(_lowmass["radius"], float))
+_lowmass_logt = np.log10(np.asarray(_lowmass["teff"], float))
+_BANDS_UM = {"TESS": (0.60, 1.00), "Vis": (0.60, 1.00), "J": (1.10, 1.40), "H": (1.50, 1.80), "K": (2.00, 2.40)}
+
+
+def lowmass_relations(Masses):
+    """Radius [Rsun] and Teff [K] for companions below 0.1 Msun (log-log interpolation of the table)."""
+    logm = np.clip(np.log10(np.asarray(Masses, float)), _lowmass_logm[0], _lowmass_logm[-1])
+    return 10**np.interp(logm, _lowmass_logm, _lowmass_logr), 10**np.interp(logm, _lowmass_logm, _lowmass_logt)
+
+
+def _band_planck(teff, band):
+    lo, hi = _BANDS_UM[band]
+    lam = np.linspace(lo, hi, 41)[None, :] * 1e-4  # cm
+    t = np.atleast_1d(np.asarray(teff, float))[:, None]
+    x = 1.438776877 / (lam * t)                    # hc / (lambda k T), lambda in cm
+    return np.trapezoid(1 / (lam**5 * np.expm1(np.clip(x, None, 700))), lam, axis=1)
+
 
 def stellar_relations(Masses: np.array,
                       max_Radii: np.array,
@@ -158,8 +186,13 @@ def stellar_relations(Masses: np.array,
     # don't allow estimated radii/Teffs to be above/below max/min value
     Radii[Radii > max_Radii] = max_Radii[Radii > max_Radii]
     Teffs[Teffs > max_Teffs] = max_Teffs[Teffs > max_Teffs]
-    Radii[Radii < 0.1] = 0.1
-    Teffs[Teffs < 2800] = 2800
+    low = (Masses < LOWMASS_FLOOR) if LOWMASS_ENABLED else np.zeros(len(Masses), bool)
+    Radii[(Radii < 0.1) & ~low] = 0.1
+    Teffs[(Teffs < 2800) & ~low] = 2800
+    if low.any():
+        Radii[low], Teffs[low] = lowmass_relations(Masses[low])
+        Radii[low] = np.minimum(Radii[low], max_Radii[low])
+        Teffs[low] = np.minimum(Teffs[low], max_Teffs[low])
     return Radii, Teffs
 
 Mass_nodes = np.array([
@@ -215,14 +248,21 @@ def flux_relation(Masses: np.array, filt: str = "TESS"):
         fluxes (numpy array): Flux ratio between star and
                               a ~1 Solar mass star.
     """
-    if (filt == "TESS") or (filt == "Vis"):
-        fluxes = 10**flux_spline(Masses)
-    if filt == "J":
-        fluxes = 10**flux_spline_J(Masses)
-    if filt == "H":
-        fluxes = 10**flux_spline_H(Masses)
-    if filt == "K":
-        fluxes = 10**flux_spline_K(Masses)
+    spline = {"TESS": flux_spline, "Vis": flux_spline, "J": flux_spline_J,
+              "H": flux_spline_H, "K": flux_spline_K}[filt]
+    fluxes = 10**spline(Masses)
+    if LOWMASS_ENABLED:
+        masses = np.atleast_1d(np.asarray(Masses, float))
+        low = masses < LOWMASS_FLOOR
+        if low.any():
+            # Anchor at the existing relation at 0.1 Msun; scale by R^2 x band blackbody.
+            r0, t0 = lowmass_relations(np.array([LOWMASS_FLOOR]))
+            r, t = lowmass_relations(masses[low])
+            ratio = (r / r0)**2 * _band_planck(t, filt) / _band_planck(t0, filt)
+            fluxes = np.array(np.broadcast_to(fluxes, masses.shape), dtype=float)
+            fluxes[low] = 10**float(spline(LOWMASS_FLOOR)) * ratio
+            if np.ndim(Masses) == 0:
+                fluxes = fluxes.item()
     return fluxes
 
 
