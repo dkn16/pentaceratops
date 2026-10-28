@@ -4,6 +4,11 @@ These examples start from a TIC/TOI or KIC/KOI identifier. Edit `TARGET` near
 the top of `tess_candidate.py` or `kepler_candidate.py`, or use `--target`.
 They download and preprocess photometry; **they do not calculate an FPP**.
 
+If you already have an observed or injected light curve, use the
+[supplied-light-curve guide](supplied_lightcurve.md). It lists the required
+arrays, metadata, stellar-field inputs, and how they enter preprocessing and FPP
+inference, with an example that starts from local arrays.
+
 For the Python workflow, obtain `prepared` directly from preprocessing:
 
 ```python
