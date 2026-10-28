@@ -148,7 +148,7 @@ def sample_ecc(x, planet, P_orb):
     """
     u = np.clip(x, 1e-12, 1-1e-12)
     if planet:
-        return (_beta.ppf(u, 0.867, 3.030))
+        return planet_eccentricity_ppf(u)
     else:
         return binary_eccentricity_ppf(u, P_orb)
     size = len(x)
@@ -163,8 +163,27 @@ def sample_ecc(x, planet, P_orb):
     return x
 
 import os as _os
-# "moe2017" (default on this branch) or "legacy" (u**(1/a), a=0.2 if P<=10 d else 0.6).
+# "moe2017" (default on this branch), "legacy" (u**(1/a), a=0.2 if P<=10 d else 0.6) or "uniform".
 BINARY_ECC = _os.environ.get("PENTACERATOPS_BINARY_ECC", "moe2017")
+# "kipping2013" (Beta(0.867, 3.030), default) or "uniform".
+PLANET_ECC = _os.environ.get("PENTACERATOPS_PLANET_ECC", "kipping2013")
+
+
+def planet_eccentricity_ppf(u):
+    """Inverse CDF of the planet eccentricity prior (Kipping 2013 Beta, or uniform on [0, 1))."""
+    u = np.clip(np.asarray(u, dtype=float), 1e-12, 1 - 1e-12)
+    if PLANET_ECC == "kipping2013":
+        return _beta.ppf(u, 0.867, 3.030)
+    if PLANET_ECC == "uniform":
+        return u
+    raise ValueError(f"Unknown PENTACERATOPS_PLANET_ECC={PLANET_ECC!r}")
+
+
+def planet_eccentricity_logpdf(e):
+    e = np.asarray(e, dtype=float)
+    if PLANET_ECC == "uniform":
+        return np.where((e >= 0) & (e < 1), 0., -np.inf)
+    return _beta.logpdf(e, 0.867, 3.030)
 
 
 def binary_eccentricity_ppf(u, P_orb):
@@ -183,6 +202,8 @@ def binary_eccentricity_ppf(u, P_orb):
     if BINARY_ECC == "legacy":
         a_shape = np.where(P <= 10, 0.2, 0.6)
         return u**(1 / a_shape)
+    if BINARY_ECC == "uniform":
+        return u
     if BINARY_ECC != "moe2017":
         raise ValueError(f"Unknown PENTACERATOPS_BINARY_ECC={BINARY_ECC!r}")
     logp = np.log10(np.maximum(P, 1e-9))
@@ -201,6 +222,8 @@ def binary_eccentricity_logpdf(e, P_orb):
     if BINARY_ECC == "legacy":
         a = np.where(P <= 10, 0.2, 0.6)
         return np.log(a) + (a - 1) * np.log(np.clip(e, 1e-300, None))
+    if BINARY_ECC == "uniform":
+        return np.where((e >= 0) & (e < 1), 0., -np.inf)
     logp = np.log10(np.maximum(P, 1e-9))
     with np.errstate(divide="ignore", invalid="ignore"):
         eta = 0.6 - 0.7 / (logp - 0.5)

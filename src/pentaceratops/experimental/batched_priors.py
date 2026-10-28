@@ -16,7 +16,8 @@ def closure(fn):
 def eccentricity(u, planet, period):
     u = np.clip(u, 1e-12, 1-1e-12)
     if planet:
-        return betaincinv(.867, 3.030, u)
+        from ..priors import planet_eccentricity_ppf
+        return planet_eccentricity_ppf(u)
     from ..priors import binary_eccentricity_ppf
     return binary_eccentricity_ppf(u, period)
 

@@ -161,7 +161,8 @@ def _inv_sample_ecc(u: float, planet: bool, P_orb: float) -> float:
     from ..priors import binary_eccentricity_ppf
     u = np.clip(u, 1e-12, 1-1e-12)
     if planet:
-        return float(_beta.ppf(u, 0.867, 3.030))
+        from ..priors import planet_eccentricity_ppf
+        return float(planet_eccentricity_ppf(np.array([u]))[0])
     else:
         return float(binary_eccentricity_ppf(np.array([u]), P_orb)[0])
 

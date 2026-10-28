@@ -172,7 +172,8 @@ def _inv_sample_ecc_vec(u_arr, planet: bool, P_orb: float):
     from scipy.stats import powerlaw as _powerlaw
     u_arr = np.clip(np.asarray(u_arr, dtype=float), 1e-12, 1.0 - 1e-12)
     if planet:
-        return np.asarray(_beta.ppf(u_arr, 0.867, 3.030), dtype=float)
+        from ..priors import planet_eccentricity_ppf
+        return np.asarray(planet_eccentricity_ppf(u_arr), dtype=float)
     from ..priors import binary_eccentricity_ppf
     return np.asarray(binary_eccentricity_ppf(u_arr, P_orb), dtype=float)
 
