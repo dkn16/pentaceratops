@@ -174,6 +174,7 @@ def _dispatch(target, adapter, *, trilegal_fname, molusc_file, N, steps, seed,
                        posterior_samples=posterior_samples, mission=adapter.mission,
                        timing_policy=getattr(adapter, "timing_policy", "observed"),
                        free_epoch=epoch_sigma is not None, epoch_sigma=epoch_sigma,
+                       model_times=getattr(adapter, "model_times", "native_fold"),
                        flux_frame="aperture", evidence_frame="same_data_null_log_bayes_factor")
     return table
 

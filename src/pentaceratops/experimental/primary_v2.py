@@ -64,10 +64,10 @@ class PrimaryOnlyAdapter(OptimizedAdapter):
         parameters = dict(R_EB=R_EB,EB_fluxratio=EB_fluxratio,P_orb=P_orb,inc=inc,a=a,R_s=R_s,
                           u1=u1,u2=u2,ecc=ecc,argp=argp,companion_fluxratio=companion_fluxratio,
                           companion_is_host=companion_is_host,exptime=exptime,nsamples=nsamples)
-        primary, _ = self.lk.simulate_EB_transit(self.sorted_eo_time, **parameters)
+        primary, _ = self.lk.simulate_EB_transit(self.model_time['primary'], **parameters)
         # simulate_EB_transit also returns a depth probe. It is deliberately
         # unused: no observed secondary means no constraint on that depth.
-        model = self.aperture(primary)[self.inverse_order]
+        model = self.aperture(self.fold_model('primary', primary))[self.inverse_order]
         gain = self.metric.gain(model)
         self.save_snapshot('binary',parameters,model,gain,secondary_omitted=True,phantom_loglike_ratio=0.)
         return -gain

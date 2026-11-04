@@ -126,10 +126,68 @@ class ModelAdapter:
         self.inverse_order = np.argsort(self.order)
         self.secondary_metric = GaussianMetric(np.ones(len(self.times["secondary"])),
             data["secondary_sigma"], None if factor is None else factor[self.slices["secondary"]])
+        self._native_fold(data)
         self.aperture_fraction = 1.
         self.record = False
         self.snapshot = None
         self.calls = dict(planet=0, binary=0, x2p=0)
+
+    def _native_fold(self, data):
+        """Where the model is evaluated and how it is folded, per model grid.
+
+        With the native fold map (``<panel>_native_time``, ``<panel>_bin_index``, ``<panel>_weight``
+        from candidate_folded_real) the model is evaluated at the true phase of every retained grid
+        bin and averaged into the folded bins with the data's own weights: A m(t) against A y.
+        Without it (older bundles) the model is evaluated once per folded bin, at its centre.
+        """
+        keys = [p+s for p in PANELS for s in ("_native_time", "_bin_index", "_weight")]
+        present = [k in data for k in keys]
+        if not any(present):
+            self.model_times = "bin_centers"
+            self.model_time = dict(primary=self.sorted_eo_time, **self.times)
+            self.fold_index = {g: np.arange(len(t), dtype=np.int64) for g, t in self.model_time.items()}
+            self.fold_weight = {g: np.ones(len(t)) for g, t in self.model_time.items()}
+            self.fold_size = {g: len(t) for g, t in self.model_time.items()}
+            self.fold_operator = None
+            return
+        if not all(present):
+            raise ValueError("Incomplete native fold map")
+        self.model_times = "native_fold"
+        self.model_time, self.fold_index, self.fold_weight, self.fold_size = {}, {}, {}, {}
+        for panel in PANELS:
+            time = np.asarray(data[panel+"_native_time"], float)
+            index = np.asarray(data[panel+"_bin_index"])
+            weight = np.asarray(data[panel+"_weight"], float)
+            m = len(self.times[panel])
+            if (time.ndim != 1 or index.shape != time.shape or weight.shape != time.shape
+                    or not np.isfinite(time).all() or not np.isfinite(weight).all()
+                    or index.dtype.kind not in "iu" or (len(index) and (index.min() < 0 or index.max() >= m))
+                    or np.any(weight <= 0) or (m > 0) != (len(time) > 0)):
+                raise ValueError(f"Invalid native fold map for the {panel} panel")
+            if not np.allclose(np.bincount(index, weights=weight, minlength=m), 1., atol=1e-12, rtol=0):
+                raise ValueError(f"Fold weights must sum to one in every {panel} bin")
+            self.model_time[panel] = np.ascontiguousarray(time)
+            self.fold_index[panel] = np.ascontiguousarray(index, dtype=np.int64)
+            self.fold_weight[panel] = np.ascontiguousarray(weight)
+            self.fold_size[panel] = m
+        # Primary grid: even and odd together, folded bins in the sorted even/odd order the scalar
+        # and batched paths already use (join_primary_secondary / inverse_order restore even, odd).
+        n_even = len(self.times["even"])
+        self.model_time["primary"] = np.concatenate([self.model_time["even"], self.model_time["odd"]])
+        self.fold_index["primary"] = np.concatenate([self.inverse_order[self.fold_index["even"]],
+                                                     self.inverse_order[n_even+self.fold_index["odd"]]])
+        self.fold_weight["primary"] = np.concatenate([self.fold_weight["even"], self.fold_weight["odd"]])
+        self.fold_size["primary"] = len(self.eo_time)
+        from scipy.sparse import csr_matrix
+        self.fold_operator = {g: csr_matrix((self.fold_weight[g], (self.fold_index[g], np.arange(len(self.model_time[g])))),
+                                            shape=(self.fold_size[g], len(self.model_time[g])))
+                              for g in self.model_time}
+
+    def fold_model(self, grid, model):
+        """Average a model evaluated at model_time[grid] into the folded bins (identity without a map)."""
+        if self.fold_operator is None:
+            return np.asarray(model)
+        return 1+np.asarray(self.fold_operator[grid] @ (np.asarray(model, float)-1.)).ravel()
 
     def integration_samples(self, nsamples=None):
         """Resolve an optional per-call override without changing adapter defaults."""
@@ -162,7 +220,7 @@ class ModelAdapter:
                           u1=u1, u2=u2, ecc=ecc, argp=argp,
                           companion_fluxratio=companion_fluxratio, companion_is_host=companion_is_host,
                           exptime=exptime, nsamples=nsamples)
-        pri = self.aperture(self.lk.simulate_TP_transit(self.sorted_eo_time, **parameters))
+        pri = self.aperture(self.fold_model("primary", self.lk.simulate_TP_transit(self.model_time["primary"], **parameters)))
         model = self.join_primary_secondary(pri, np.ones(len(self.times["secondary"])))
         gain = self.metric.gain(model)
         self.save_snapshot("planet", parameters, model, gain)
@@ -179,14 +237,15 @@ class ModelAdapter:
                           exptime=exptime, nsamples=nsamples)
         ts = self.times["secondary"]
         offset = float((self.lk.mean_anomaly_difference(ecc, np.deg2rad(argp)) - .5) * P_orb)
-        pri, sec = self.lk.simulate_EB_transit_secondary(self.sorted_eo_time, ts, **parameters)
+        pri, sec = self.lk.simulate_EB_transit_secondary(self.model_time["primary"], self.model_time["secondary"], **parameters)
+        pri, sec = self.fold_model("primary", pri), self.fold_model("secondary", sec)
         outside = not ts.min() <= offset <= ts.max()
         phantom_gain = 0.
         if outside:
             # Preserve the established conservative no-secondary-elsewhere
             # assumption, as an independent same-length synthetic constraint.
             sec = np.ones_like(ts)
-            phantom = self.aperture(self.centered_secondary(ts, **parameters))
+            phantom = self.aperture(self.fold_model("secondary", self.centered_secondary(self.model_time["secondary"], **parameters)))
             phantom_gain = self.secondary_metric.gain(phantom)
         model = self.join_primary_secondary(self.aperture(pri), self.aperture(sec))
         gain = self.metric.gain(model) + phantom_gain
@@ -213,8 +272,11 @@ class ModelAdapter:
             allowed = bool(alternating_overlap(te, to, parameters, exptime)[0])
         if not allowed:
             return np.inf
-        e1, o2 = self.lk.simulate_EB_transit_evenodd(te, to, **parameters)
-        o1, e2 = self.lk.simulate_EB_transit_evenodd(to, te, **parameters)
+        me, mo = self.model_time["even"], self.model_time["odd"]
+        e1, o2 = self.lk.simulate_EB_transit_evenodd(me, mo, **parameters)
+        o1, e2 = self.lk.simulate_EB_transit_evenodd(mo, me, **parameters)
+        e1, e2 = self.fold_model("even", e1), self.fold_model("even", e2)
+        o1, o2 = self.fold_model("odd", o1), self.fold_model("odd", o2)
         secondary = np.ones(len(self.times["secondary"]))
         forward = np.concatenate([self.aperture(e1), self.aperture(o2), secondary])
         reverse = np.concatenate([self.aperture(e2), self.aperture(o1), secondary])

@@ -73,6 +73,15 @@ def regular_bin(time, flux, error, dt):
     return origin + np.arange(size) * dt, f, e, true_time
 
 
+def sample_times(sector):
+    """True mean time of each grid bin (grid node where unobserved). Bundles saved before true_time existed use the grid."""
+    grid = np.asarray(sector["time"], float)
+    if "true_time" not in sector:
+        return grid
+    true = np.asarray(sector["true_time"], float)
+    return np.where(np.isfinite(true), true, grid)
+
+
 def window_grid(candidate, dt, options):
     requested = options.window_durations * candidate.duration_days
     cap = options.max_half_period_fraction * candidate.period_days
@@ -154,7 +163,8 @@ def preprocess_blocks(blocks, candidate, companions=(), options=None):
             f, e = np.r_[f, np.full(padding, np.nan)], np.r_[e, np.full(padding, np.nan)]
             true_time = np.r_[true_time, np.full(padding, np.nan)]
         observed = np.isfinite(f) & np.isfinite(e) & (e > 0)
-        _, protected = assignments(t, observed, candidate, centers, dt)
+        science_time = np.where(np.isfinite(true_time), true_time, t)
+        _, protected = assignments(science_time, observed, candidate, centers, dt)
         training = observed & ~protected
         if training.sum() < 140:
             raise ValueError(f"Segment {block['segment']}: only {training.sum()} training bins after exact "
@@ -172,7 +182,7 @@ def preprocess_blocks(blocks, candidate, companions=(), options=None):
             raise ValueError("Nonfinite FGP residuals")
         sectors.append(dict(segment=int(block["segment"]), time=t, true_time=true_time, raw_flux=f, input_error=e,
                             native_keep=keep, base_length=base_length, **model))
-        pieces.append(dict(time=t[observed], raw=f[observed], flux=model["residual_flux"][observed],
+        pieces.append(dict(time=t[observed], true_time=true_time[observed], raw=f[observed], flux=model["residual_flux"][observed],
                            error=model["relative_error"][observed], protected=protected[observed],
                            segment=np.full(observed.sum(), int(block["segment"]))))
         diagnostics.append(dict(segment=int(block["segment"]), observed_bins=int(observed.sum()),
@@ -185,8 +195,8 @@ def preprocess_blocks(blocks, candidate, companions=(), options=None):
     stream = {key: value[order] for key, value in stream.items()}
     if np.any(np.diff(stream["time"]) <= 0):
         raise ValueError("Overlapping sector/quarter regular grids; duplicate science data must be resolved")
-    windows = fold(stream["time"], stream["flux"], stream["error"], candidate, centers, dt)
-    _, science = assignments(stream["time"], np.ones(len(order), bool), candidate, centers, dt)
+    windows = fold(stream["true_time"], stream["flux"], stream["error"], candidate, centers, dt)
+    _, science = assignments(stream["true_time"], np.ones(len(order), bool), candidate, centers, dt)
     np.testing.assert_array_equal(science, stream["protected"])
     windows.update(period=candidate.period_days, duration_days=candidate.duration_days,
                    epoch_bjd=candidate.epoch_bjd, time_zero_bjd=candidate.time_zero,

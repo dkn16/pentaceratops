@@ -2,7 +2,7 @@
 import numpy as np
 from scipy.sparse import coo_matrix, diags
 
-from .candidate import PANELS, assignments
+from .candidate import PANELS, assignments, phase, sample_times
 from .catalog import Candidate
 from .flux import require_aperture_frame
 from .folded import FoldedFourierData
@@ -51,7 +51,7 @@ def candidate_state(saved):
             raise ValueError("Saved flux/error shapes differ from the grid")
         if not np.array_equal(obs, np.isfinite(raw) & np.isfinite(error) & (error > 0)):
             raise ValueError("Saved observation mask does not match the raw flux/errors")
-        _, protected = assignments(t, obs, ephemeris, centers, dt)
+        _, protected = assignments(sample_times(sector), obs, ephemeris, centers, dt)
         if (not np.array_equal(protected, sector["protected"])
                 or not np.array_equal(obs & ~protected, sector["fit_mask"])):
             raise ValueError("Saved FGP protection/training masks differ from the likelihood windows")
@@ -79,14 +79,26 @@ def candidate_folded_real(saved):
     centers = np.asarray(windows["time_even"])
     size, operators = len(centers), []
     sums = np.zeros(3*size)
+    # Native fold map: for every grid bin retained in a panel, its true phase relative to the panel's
+    # reference (transit centre, or the nominal secondary at P/2), its folded bin and its fold weight.
+    # The likelihood evaluates the model at these phases and folds it with these weights, exactly
+    # as the data were folded, instead of evaluating one model value at each folded bin's centre.
+    native = {panel: dict(time=[], bin=[], weight=[]) for panel in PANELS}
     for sector in segments:
-        assigned, _ = assignments(sector["time"], sector["observed"], ephem, centers, dt)
+        times = sample_times(sector)
+        assigned, _ = assignments(times, sector["observed"], ephem, centers, dt)
+        relative = dict(primary=phase(times, ephem.epoch_relative, ephem.period_days)[0],
+                        secondary=phase(times, ephem.epoch_relative+ephem.period_days/2, ephem.period_days)[0])
         rows, columns, weights = [], [], []
         for i, panel in enumerate(PANELS):
             ids, use = assigned[panel]
+            weight = 1/np.asarray(sector["relative_error"])[use]**2
             rows.extend(i*size+ids[use])
             columns.extend(np.flatnonzero(use))
-            weights.extend(1/np.asarray(sector["relative_error"])[use]**2)
+            weights.extend(weight)
+            native[panel]["time"].append(relative["secondary" if panel == "secondary" else "primary"][use])
+            native[panel]["bin"].append(ids[use])
+            native[panel]["weight"].append(weight)
         operator = coo_matrix((weights, (rows, columns)),
                               shape=(3*size, len(sector["time"]))).tocsr()
         sums += np.asarray(operator.sum(axis=1)).ravel()
@@ -116,9 +128,13 @@ def candidate_folded_real(saved):
         if (not np.allclose(map_flux[part], windows["flux_"+panel], atol=2e-12, rtol=0)
                 or not np.allclose(error, windows["err_"+panel], atol=0, rtol=1e-10)):
             raise ValueError("Saved folded data do not match the native observation operator")
+        # Scored at each bin's true mean phase; bundles saved before phase_* existed use the bin centres.
         data.update({panel+"_time": centers.copy(), panel+"_mean_flux": mean[part],
                      panel+"_map_flux": map_flux[part], panel+"_input_error": error,
                      panel+"_sigma": np.full(size, np.median(error))})
+        bins = np.concatenate(native[panel]["bin"]).astype(np.int64)
+        data.update({panel+"_native_time": np.concatenate(native[panel]["time"]), panel+"_bin_index": bins,
+                     panel+"_weight": np.concatenate(native[panel]["weight"])/sums[i*size+bins]})
     data["sigma"] = np.concatenate([data[p+"_sigma"] for p in PANELS])
     return data
 
