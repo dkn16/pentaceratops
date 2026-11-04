@@ -66,7 +66,11 @@ def regular_bin(time, flux, error, dt):
     f, e = np.full(size, np.nan), np.full(size, np.nan)
     f[observed] = np.bincount(ids, weights=weights * flux, minlength=size)[observed] / sums[observed]
     e[observed] = 1 / np.sqrt(sums[observed])
-    return origin + np.arange(size) * dt, f, e
+    # The grid is for the FGP. Each bin's flux is an average at its samples' mean time, not at the grid node,
+    # which differs by up to dt/2 and by a nearly constant amount across a sector. Models must use true_time.
+    true_time = np.full(size, np.nan)
+    true_time[observed] = np.bincount(ids, weights=weights * time, minlength=size)[observed] / sums[observed]
+    return origin + np.arange(size) * dt, f, e, true_time
 
 
 def window_grid(candidate, dt, options):
@@ -142,12 +146,13 @@ def preprocess_blocks(blocks, candidate, companions=(), options=None):
             relative, _ = phase(time, other.epoch_relative, other.period_days)
             # Remove before regular-grid binning, with an exposure-edge margin.
             keep &= abs(relative) > options.companion_mask_durations * other.duration_days + dt/2
-        t, f, e = regular_bin(time[keep], raw[keep], error[keep], dt)
+        t, f, e, true_time = regular_bin(time[keep], raw[keep], error[keep], dt)
         base_length = len(t)
         padding = int(np.ceil(base_length * options.padding_fraction))
         if padding:
             t = np.r_[t, t[-1] + np.arange(1, padding + 1) * dt]
             f, e = np.r_[f, np.full(padding, np.nan)], np.r_[e, np.full(padding, np.nan)]
+            true_time = np.r_[true_time, np.full(padding, np.nan)]
         observed = np.isfinite(f) & np.isfinite(e) & (e > 0)
         _, protected = assignments(t, observed, candidate, centers, dt)
         training = observed & ~protected
@@ -165,7 +170,7 @@ def preprocess_blocks(blocks, candidate, companions=(), options=None):
             raise ValueError("FGP training/protection mismatch")
         if not np.all(np.isfinite(model["residual_flux"][observed])):
             raise ValueError("Nonfinite FGP residuals")
-        sectors.append(dict(segment=int(block["segment"]), time=t, raw_flux=f, input_error=e,
+        sectors.append(dict(segment=int(block["segment"]), time=t, true_time=true_time, raw_flux=f, input_error=e,
                             native_keep=keep, base_length=base_length, **model))
         pieces.append(dict(time=t[observed], raw=f[observed], flux=model["residual_flux"][observed],
                            error=model["relative_error"][observed], protected=protected[observed],

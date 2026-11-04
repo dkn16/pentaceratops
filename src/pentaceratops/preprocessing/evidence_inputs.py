@@ -131,7 +131,9 @@ def candidate_folded_fourier(saved):
     as in prepare_sector. Measurement white noise enters exactly once.
     """
     ephem, _, segments, _, dt = candidate_state(saved)
-    times = np.concatenate([s["time"][s["observed"]] for s in segments])
+    # True mean sample times, not grid nodes: the model is scored at these times. Bundles saved before
+    # true_time existed fall back to the grid.
+    times = np.concatenate([np.asarray(s.get("true_time", s["time"]))[s["observed"]] for s in segments])
     flux = np.concatenate([s["raw_flux"][s["observed"]]/s["center"] for s in segments])
     operator, centers, bins, weights = full_orbit_fold(times, ephem.period_days,
                                                       ephem.epoch_relative, dt)
