@@ -95,7 +95,8 @@ def test_full_orbit_covariance_matches_dense_saved_psd(monkeypatch):
     np.testing.assert_allclose(folded.block.precision @ expected, np.eye(len(expected)), atol=3e-13, rtol=0)
     np.testing.assert_allclose(folded.block.flux,
         1+a@(sector["raw_flux"][obs]/sector["center"]-1), atol=2e-16, rtol=0)
-    np.testing.assert_array_equal(folded.native_time, sector["time"][obs])
+    # Native times are the bins' true mean times, equal to the nodes here only to rounding.
+    np.testing.assert_allclose(folded.native_time, sector["true_time"][obs], atol=1e-12, rtol=0)
     assert obs.sum() > sum(saved.output["stream"]["protected"])
 
 

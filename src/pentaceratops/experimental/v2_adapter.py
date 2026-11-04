@@ -38,13 +38,15 @@ class OptimizedAdapter(ModelAdapter):
         self.physical = {}
         self.grids = {}
         self.metric_arrays = {}
-        for name, grid in dict(primary=self.sorted_eo_time, **self.times).items():
+        # Model evaluation times and fold map per grid (ModelAdapter._native_fold): the native fold
+        # map when the data carry one, otherwise one model value per folded bin at its centre.
+        for name, grid in self.model_time.items():
             times = np.ascontiguousarray(grid)
             for mult in (1, 2):
                 phase = times % (mult*data['period'])
                 order = np.argsort(phase, kind='stable')
-                self.grids[name,mult] = (times,np.ascontiguousarray(phase[order]),
-                    np.ascontiguousarray(order),np.arange(len(times),dtype=np.int64),np.ones(len(times)))
+                self.grids[name,mult] = (times,np.ascontiguousarray(phase[order]),np.ascontiguousarray(order),
+                    self.fold_index[name],self.fold_weight[name],self.fold_size[name])
         for name,metric in [('joint',self.metric),('secondary',self.secondary_metric)]:
             n = len(metric.flux)
             self.metric_arrays[name] = (np.ascontiguousarray(metric.precision.ravel()),
@@ -79,8 +81,8 @@ class OptimizedAdapter(ModelAdapter):
         expected=self.data['period']*(2 if x2p else 1)
         if not np.allclose(p['P_orb'],expected,atol=0,rtol=1e-12):raise ValueError('Expected fixed P or 2P')
         coefficients,windows=orbit_setup(pars)
-        times,phase,order,index,weight=self.grids[grid,2 if x2p else 1]
-        signal,count=project_strict(pars,coefficients,windows,times,phase,order,index,weight,len(times),self.data['exptime'],nsamples)
+        times,phase,order,index,weight,size=self.grids[grid,2 if x2p else 1]
+        signal,count=project_strict(pars,coefficients,windows,times,phase,order,index,weight,size,self.data['exptime'],nsamples)
         self.profile['exposure_seconds']+=time.perf_counter()-start
         self.profile['native_evaluations']+=int(count.sum())
         return 1+signal

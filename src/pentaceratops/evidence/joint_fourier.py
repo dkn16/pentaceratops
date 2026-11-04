@@ -69,6 +69,7 @@ def sample_joint_scenario(adapter, scenario, star, *, trilegal, molusc=None,
         result.update(lnZ=result["lnBF"]+adapter.metric.null_loglike,
             null_loglike=adapter.metric.null_loglike,scenario=scenario,seed=int(seed),N=int(N),steps=int(steps),
             backend=getattr(adapter,"backend","joint_fourier_observed_strict_batch"),physical_result=physical,
+            model_times=getattr(adapter,"model_times","native_fold"),
             sampling_stats=dict(stats),profile=dict(adapter.profile),parity=adapter.parity)
         return result
     finally:

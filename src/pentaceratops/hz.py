@@ -167,6 +167,7 @@ def _dispatch(target, adapter, *, trilegal_fname, molusc_file, N, steps, seed,
                        sampling_config={s: policy[s] for s in dict.fromkeys(table.scenario)},
                        posterior_samples=posterior_samples, mission=adapter.mission,
                        timing_policy=getattr(adapter, "timing_policy", "observed"),
+                       model_times=getattr(adapter, "model_times", "native_fold"),
                        flux_frame="aperture", evidence_frame="same_data_null_log_bayes_factor")
     return table
 
