@@ -179,6 +179,20 @@ likelihood-ready Real preparation and cannot discard a candidate bundle's
 secondary observations. Use `timing_policy="legacy"` for the archived Real
 timing rule. The existing ordinary-EB secondary penalty remains unchanged.
 
+Fourier-only options are `free_epoch` and `epoch_sigma`. By default
+(`free_epoch=True`) every scenario samples one extra parameter, the transit time
+minus the supplied epoch, with a zero-mean Gaussian prior; all eclipses of a
+scenario move together. `epoch_sigma` is the prior width in days and should be
+the epoch uncertainty at the observed transits, for example the catalogue epoch
+and period errors propagated to the middle of the data. When omitted it is
+3 minutes (`pentaceratops.evidence.joint_fourier.DEFAULT_EPOCH_SIGMA`).
+`free_epoch=False` fixes the epoch, as in earlier versions; with a fixed epoch
+a timing error of about a minute is absorbed by eccentricity at high SNR.
+The table gains `epoch_offset` and `epoch_offset_err` columns (posterior mean
+and standard deviation in days) and the records keep the offset samples as
+`epoch_offset` and `posterior_epoch_offset`. These options are rejected for
+Real, whose epoch is always fixed.
+
 Omit `scenarios` for all eligible hypotheses. An explicit subset produces a
 conditional FPP. The sampler settings are effort controls, not a convergence
 guarantee. Inference is sequential within a target; use isolated processes,

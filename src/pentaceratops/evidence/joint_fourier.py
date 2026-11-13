@@ -15,9 +15,30 @@ from ..experimental.sampler_mode import mode_context
 FAMILIES=("TP","EB","EBx2P","PTP","PEB","PEBx2P","STP","SEB","SEBx2P",          "DTP","DEB","DEBx2P","BTP","BEB","BEBx2P")
 
 
+DEFAULT_EPOCH_SIGMA=3./1440.  # days; default Gaussian prior width of the free transit-time offset
+
+
+def resolve_epoch_sigma(free_epoch=True, epoch_sigma=None):
+    """Prior width [days] of the transit-time offset, or None when the epoch is fixed.
+
+    The offset is one extra sampled parameter, transit time minus the supplied epoch, with a
+    zero-mean Gaussian prior. Supply the epoch uncertainty at the observed transits as
+    epoch_sigma; when omitted, DEFAULT_EPOCH_SIGMA (3 minutes) is used.
+    """
+    if not isinstance(free_epoch,(bool,np.bool_)):raise ValueError("free_epoch must be a boolean")
+    if not free_epoch:
+        if epoch_sigma is not None:raise ValueError("epoch_sigma requires free_epoch=True")
+        return None
+    if epoch_sigma is None:return DEFAULT_EPOCH_SIGMA
+    if isinstance(epoch_sigma,(bool,np.bool_)) or not np.isscalar(epoch_sigma) or not np.isfinite(epoch_sigma) or epoch_sigma<=0:
+        raise ValueError("epoch_sigma must be a positive finite number of days")
+    return float(epoch_sigma)
+
+
 def sample_joint_scenario(adapter, scenario, star, *, trilegal, molusc=None,
-                          N=500, steps=50, seed=42, posterior_samples=2000):
-    """Retain complete weighted pools, resamples, and an independently replayed model."""
+                          N=500, steps=50, seed=42, posterior_samples=2000, epoch_sigma=None):
+    """epoch_sigma (days): Gaussian prior width of a free epoch offset; None keeps the epoch fixed.
+    Retain complete weighted pools, resamples, and an independently replayed model."""
     name=scenario[1:] if scenario.startswith("N") else scenario
     if name not in FAMILIES:
         raise ValueError("Unknown scenario")
@@ -32,6 +53,7 @@ def sample_joint_scenario(adapter, scenario, star, *, trilegal, molusc=None,
     state=np.random.get_state();np.random.seed(seed)
     result={}
     adapter.reset_profile();adapter.calls=dict(planet=0,binary=0,x2p=0)
+    adapter.epoch_sigma=None if epoch_sigma is None else float(epoch_sigma);adapter.epoch_samples=None
     try:
         with mode_context(module,adapter,"batch_prior") as stats,patched_engine(adapter):
             original=module._run_persistent_evidence
@@ -42,15 +64,21 @@ def sample_joint_scenario(adapter, scenario, star, *, trilegal, molusc=None,
                 finite=np.isfinite(targets)&np.isfinite(weights)&(weights>0)
                 result.update(lnBF=float(z),physical_parameters=positions.copy(),
                     weights=weights.copy(),log_target=targets.copy())
+                offsets=adapter.epoch_samples
+                if epoch_sigma is not None:
+                    if offsets is None or len(offsets)!=len(positions):raise RuntimeError("Missing epoch samples")
+                    result.update(epoch_offset=offsets.copy(),epoch_sigma=float(epoch_sigma))
                 if np.isfinite(z) and finite.any():
                     ids=np.flatnonzero(finite);prob=weights[finite]/weights[finite].sum()
                     chosen=np.random.default_rng(seed+9281).choice(ids,size=posterior_samples,p=prob)
                     result.update(posterior_parameters=positions[chosen].copy(),
                         posterior_log_target=targets[chosen].copy(),posterior_source_index=chosen)
+                    if epoch_sigma is not None:result["posterior_epoch_offset"]=offsets[chosen].copy()
                     best=int(np.argmax(np.where(finite,targets,-np.inf)))
                     adapter.record=True;adapter.snapshot=None
+                    if epoch_sigma is not None:adapter.scalar_epoch_offset=float(offsets[best])
                     try: replay=loglike(positions[best])
-                    finally: adapter.record=False
+                    finally: adapter.record=False;adapter.scalar_epoch_offset=0.
                     if not np.isclose(replay,targets[best],atol=2e-5,rtol=2e-12):
                         raise RuntimeError("Scalar best-fit replay differs from retained log target")
                     if adapter.snapshot is None:raise RuntimeError("No physical best-fit model")
@@ -72,23 +100,26 @@ def sample_joint_scenario(adapter, scenario, star, *, trilegal, molusc=None,
             sampling_stats=dict(stats),profile=dict(adapter.profile),parity=adapter.parity)
         return result
     finally:
+        adapter.epoch_sigma=None;adapter.scalar_epoch_offset=0.
         real.POSTERIOR_NSAMPLES,eclipses.POSTERIOR_NSAMPLES=old_counts
         np.random.set_state(state)
 
 
 def calc_probs_joint_fourier(target,P_orb,blocks,epoch,*,trilegal_fname=None,molusc_file=None,
                             N=500,steps=50,nsamples=7,seed=42,posterior_samples=2000,
-                            parity="profile",eb_eta=1.,filt=None):
+                            parity="profile",eb_eta=1.,filt=None,free_epoch=True,epoch_sigma=None):
     """Return all scenario Bayes factors/FPP and posterior records for one target.
 
     blocks contain observed flux and PSD covariance, constructed with
     GaussianBlock.from_spectrum or preprocessing.joint_fourier.prepare_sector.
     This opt-in API neither interpolates gaps nor requires a secondary window.
     Threads are unsupported; parallel campaigns should use isolated processes.
+    free_epoch/epoch_sigma follow resolve_epoch_sigma.
     """
     import pandas as pd
     from ..experimental.joint_fourier import JointFourierAdapter
     if not np.isfinite(eb_eta) or eb_eta<=0:raise ValueError("eb_eta must be positive")
+    epoch_sigma=resolve_epoch_sigma(free_epoch,epoch_sigma)
     stars=target.stars.loc[target.stars.tdepth>0].reset_index(drop=True)
     if stars.empty:raise ValueError("No eligible stars; run calc_depths first")
     population=trilegal_fname or getattr(target,"trilegal_fname",None)
@@ -105,7 +136,7 @@ def calc_probs_joint_fourier(target,P_orb,blocks,epoch,*,trilegal_fname=None,mol
         for scenario in FAMILIES if i==0 else ("NTP","NEB","NEBx2P"):
             result=sample_joint_scenario(adapter,scenario,star,trilegal=population,
                 molusc=molusc_file if i==0 else None,N=N,steps=steps,seed=seed+1009*len(rows),
-                posterior_samples=posterior_samples)
+                posterior_samples=posterior_samples,epoch_sigma=epoch_sigma)
             records[(int(star.ID),scenario)]=result
             rows.append(dict(ID=int(star.ID),scenario=scenario,lnBF=result["lnBF"],lnZ=result["lnZ"]))
     table=pd.DataFrame(rows);binary=table.scenario.str.contains("EB").to_numpy()
@@ -115,5 +146,6 @@ def calc_probs_joint_fourier(target,P_orb,blocks,epoch,*,trilegal_fname=None,mol
     accepted=table.scenario.isin(("TP","PTP","DTP"))
     table.attrs.update(FPP=float(table.loc[~accepted,"probability"].sum()),
         FPP_EB=float(table.loc[binary,"probability"].sum()),eb_eta=eb_eta,
-        posterior_records=records,backend="joint_fourier_observed_strict_batch")
+        posterior_records=records,backend="joint_fourier_observed_strict_batch",
+        free_epoch=epoch_sigma is not None,epoch_sigma=epoch_sigma)
     return table

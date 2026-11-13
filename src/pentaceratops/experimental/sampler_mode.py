@@ -16,6 +16,28 @@ def mode_context(module, adapter, mode, validate=None):
         if unused: raise ValueError(f'Unexpected sampler options: {unused}')
         prior_batch = make_prior(prior_transform)
         loglike_batch = lambda theta: adapter.likelihood_batch(loglike, theta)
+        sigma = getattr(adapter, 'epoch_sigma', None)
+        if sigma is not None:
+            # Free epoch: one trailing coordinate, offset ~ N(0, sigma) in days. The scenario's own
+            # prior and likelihood see the original coordinates only.
+            import numpy as np
+            from scipy.special import ndtri
+            if mode != 'batch_prior' or validate is not None or not np.isfinite(sigma) or sigma <= 0:
+                raise ValueError('Free epoch needs batch_prior mode and a positive finite width')
+            base_prior, base_batch, base_like = prior_transform, prior_batch, loglike
+            draw = lambda u: sigma*ndtri(np.clip(u, 1e-9, 1-1e-9))
+            def prior_transform(u):
+                u = np.asarray(u, float)
+                return np.append(base_prior(u[:-1].copy()), draw(u[-1]))
+            def prior_batch(u):
+                u = np.asarray(u, float)
+                return np.column_stack([base_batch(np.ascontiguousarray(u[:, :-1])), draw(u[:, -1])])
+            def loglike(theta):
+                adapter.scalar_epoch_offset = float(theta[-1])
+                try: return base_like(theta[:-1])
+                finally: adapter.scalar_epoch_offset = 0.
+            loglike_batch = lambda theta: adapter.likelihood_batch(base_like, theta)
+            ndim = ndim+1
         if validate is not None:
             validate(loglike, prior_transform, prior_batch, loglike_batch, ndim)
         stats['sampler_invocations'] += 1
@@ -42,6 +64,10 @@ def mode_context(module, adapter, mode, validate=None):
         finally:
             stats['sampler_seconds'] += time.perf_counter()-start
         import numpy as np
+        if sigma is not None:
+            positions = np.asarray(positions)
+            adapter.epoch_samples = positions[:, -1].copy()
+            positions = positions[:, :-1]
         return z, SimpleNamespace(samples=positions, weights=weights, logz=np.array([z]), log_likelihoods=values)
     module._run_persistent_evidence = run
     try: yield stats

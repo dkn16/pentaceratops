@@ -159,7 +159,10 @@ The example explicitly chooses the paper's eta=0.1.
 Particle counts are effort settings, not evidence-convergence guarantees.
 
 The JSON also accepts `scenarios`, `parity`, `filt`, `missing_host_policy`, and,
-for Real, `primary_only`, `include_gp` and `timing_policy`. Unknown or incompatible
+for Real, `primary_only`, `include_gp` and `timing_policy`. For Fourier it accepts
+`free_epoch` (default `true`) and `epoch_sigma` in days (default 3 minutes), the
+Gaussian prior width of a sampled transit-time offset; see the
+[evidence API](evidence_api.md#arguments). Unknown or incompatible
 settings fail explicitly. Omit `scenarios` to run all eligible scenario families.
 
 Each result retains the full weighted sampling pools, best-fit replay records,

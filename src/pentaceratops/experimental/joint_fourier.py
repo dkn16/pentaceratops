@@ -66,6 +66,12 @@ class JointFourierAdapter:
         self.profile = dict(physical_setup_seconds=0., physics_seconds=0., exposure_seconds=0.,
                             covariance_seconds=0., native_evaluations=0, model_batches=0)
 
+    # Optional free epoch: Gaussian prior width in days (None = epoch fixed at the catalogue value).
+    # The offset is one extra trailing sampler coordinate; batched rows carry it as p["epoch_offset"],
+    # the scalar reference reads scalar_epoch_offset (set by the sampler hook before each call).
+    epoch_sigma = None
+    scalar_epoch_offset = 0.
+
     def _check(self, kind, p):
         expected = self.period * (2 if kind == "x2p" else 1)
         if not np.allclose(p["P_orb"], expected, atol=0, rtol=1e-12):
@@ -81,14 +87,16 @@ class JointFourierAdapter:
         """Orbital centers and light fractions shared by scalar/batched models."""
         comp = p["companion_fluxratio"] / (1-p["companion_fluxratio"])
         host = np.where(p["companion_is_host"], comp, 1.)
+        shift = p.get("epoch_offset", self.scalar_epoch_offset)  # transit time minus catalogue epoch [d]
         if kind == "planet":
-            return p["R_p"]*lk.Rearth/(p["R_s"]*lk.Rsun), 0., 0., host/(1+comp), 0.
+            return p["R_p"]*lk.Rearth/(p["R_s"]*lk.Rsun), shift, 0., host/(1+comp), 0.
         k = p["R_EB"] / p["R_s"]
         k = np.where(abs(k-1.) < 1e-6, k*.999, k)
         delta = lk.mean_anomaly_difference(p["ecc"], np.deg2rad(p["argp"])) * p["P_orb"]
         primary = -(delta-p["P_orb"]/2)/2 if kind == "x2p" else np.zeros_like(delta)
         if reverse:
             primary = primary+p["P_orb"]/2
+        primary = primary+shift
         eb = p["EB_fluxratio"] / (1-p["EB_fluxratio"])
         return k, primary, primary+delta, host/(1+comp+eb), eb/(1+comp+eb)
 
@@ -122,6 +130,8 @@ class JointFourierAdapter:
             gain = max(gain, second) if self.parity == "profile" else np.logaddexp(gain, second)-np.log(2)
         if self.record:
             clean = {k: np.asarray(v).item() for k, v in p.items()}
+            if self.epoch_sigma is not None:
+                clean["epoch_offset"] = float(self.scalar_epoch_offset)
             self.snapshot = dict(kind=kind, parameters=clean, model=model.copy(),
                 photometric_loglike_ratio=float(gain), aperture_fraction=float(self.aperture_fraction), **extra)
         return -float(gain)
@@ -203,7 +213,13 @@ class JointFourierAdapter:
             raise RuntimeError("Best-fit replay must use the scalar reference")
         physical = self.make_physics(scalar)
         start = time.perf_counter()
+        offsets = None
+        if self.epoch_sigma is not None:
+            theta = np.asarray(theta)
+            offsets, theta = theta[:, -1], theta[:, :-1]
         values, ids, columns = physical.evaluate(theta)
+        if offsets is not None:
+            columns = dict(columns, epoch_offset=np.ascontiguousarray(offsets[ids]))
         self.profile["physics_seconds"] += time.perf_counter()-start
         for lo in range(0, len(ids), self.chunk_size):
             sl = slice(lo, lo+self.chunk_size)

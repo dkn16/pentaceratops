@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from .api import run_evidence
-from .evidence.joint_fourier import FAMILIES, sample_joint_scenario
+from .evidence.joint_fourier import FAMILIES, resolve_epoch_sigma, sample_joint_scenario
 from .experimental.covariance import PANELS, scenario_kwargs
 from .experimental.v2_adapter import OptimizedAdapter
 from .experimental.primary_v2 import PrimaryOnlyAdapter
@@ -93,7 +93,7 @@ def real_adapter(data, *, mission, filt=None, primary_only=False, include_gp=Tru
 
 
 def _dispatch(target, adapter, *, trilegal_fname, molusc_file, N, steps, seed,
-              posterior_samples, eb_eta, scenarios, missing_host_policy):
+              posterior_samples, eb_eta, scenarios, missing_host_policy, epoch_sigma=None):
     N = None if N is None else _positive_integer(N, "N")
     steps = None if steps is None else _positive_integer(steps, "steps")
     policy = sampling_policy(N=N, steps=steps)
@@ -146,10 +146,11 @@ def _dispatch(target, adapter, *, trilegal_fname, molusc_file, N, steps, seed,
     for star, scenario, scenario_seed, molusc in tasks:
         adapter.aperture_fraction = float(star.fluxratio)
         config = policy[scenario]
+        extra = {} if epoch_sigma is None else dict(epoch_sigma=epoch_sigma)
         result = sample_joint_scenario(
             adapter, scenario, star, trilegal=population, molusc=molusc,
             N=config["N"], steps=config["steps"], seed=scenario_seed,
-            posterior_samples=posterior_samples,
+            posterior_samples=posterior_samples, **extra,
         )
         if not np.isfinite(result["lnBF"]) and not result.get("empty_support", False):
             raise RuntimeError(f"Unfinished/nonfinite evidence: {star.ID}/{scenario}")
@@ -158,6 +159,11 @@ def _dispatch(target, adapter, *, trilegal_fname, molusc_file, N, steps, seed,
                          lnZ=result["lnZ"], null_loglike=result["null_loglike"],
                          aperture_fraction=adapter.aperture_fraction, seed=scenario_seed,
                          sampling_N=config["N"], sampling_steps=config["steps"]))
+        if epoch_sigma is not None:
+            # Posterior mean and standard deviation of transit time minus the supplied epoch [days].
+            draws = np.asarray(result.get("posterior_epoch_offset", ()), float)
+            rows[-1].update(epoch_offset=draws.mean() if draws.size else np.nan,
+                            epoch_offset_err=draws.std() if draws.size else np.nan)
     table = scenario_probabilities(pd.DataFrame(rows), evidence_column="lnBF", eb_eta=eb_eta)
     table.attrs.update(posterior_records=records, backend=adapter.backend,
                        scenario_scope="all" if selected is None else "conditional_subset",
@@ -167,6 +173,7 @@ def _dispatch(target, adapter, *, trilegal_fname, molusc_file, N, steps, seed,
                        sampling_config={s: policy[s] for s in dict.fromkeys(table.scenario)},
                        posterior_samples=posterior_samples, mission=adapter.mission,
                        timing_policy=getattr(adapter, "timing_policy", "observed"),
+                       free_epoch=epoch_sigma is not None, epoch_sigma=epoch_sigma,
                        flux_frame="aperture", evidence_frame="same_data_null_log_bayes_factor")
     return table
 
@@ -226,8 +233,14 @@ def calc_probs_folded_real(target, data, *, trilegal_fname=None, molusc_file=Non
 def calc_probs_folded_fourier(target, folded, *, trilegal_fname=None, molusc_file=None,
                               N=None, steps=None, nsamples=7, seed=42, posterior_samples=2000,
                               parity="profile", eb_eta=1., filt=None, scenarios=None,
-                              missing_host_policy="error", output_path=None):
+                              missing_host_policy="error", output_path=None,
+                              free_epoch=True, epoch_sigma=None):
     """Return a RunResult for the full-orbit folded PSD likelihood.
+
+    By default every scenario also samples a transit-time offset from the supplied
+    epoch, with a zero-mean Gaussian prior of width epoch_sigma [days] (3 minutes
+    when omitted); eclipses of the same scenario move together. free_epoch=False
+    fixes the epoch. The table reports each scenario's posterior offset.
 
     ``folded`` is FoldedFourierData, prepared once then optionally saved and
     memory-mapped. Physical predictions use every contributing native exposure.
@@ -241,10 +254,12 @@ def calc_probs_folded_fourier(target, folded, *, trilegal_fname=None, molusc_fil
         RunResult.check_destination(output_path)
     if not isinstance(folded, FoldedFourierData):
         raise TypeError("Require FoldedFourierData with native times and folding weights")
+    epoch_sigma = resolve_epoch_sigma(free_epoch, epoch_sigma)
     adapter = folded.adapter(mission=_mission(target), filt=filt, parity=parity, nsamples=nsamples)
     adapter.backend = "folded_fourier_native_exposure_strict_batch"
     metadata = dict(likelihood="folded_fourier", period=folded.period, epoch=folded.epoch,
                     timing_policy="observed", max_anomaly_shift=None,
+                    free_epoch=epoch_sigma is not None, epoch_sigma=epoch_sigma,
                     exptime=folded.block.exptime, local_windows=False,
                     covariance="sum_s A_s C_s A_s.T", model="A m(native exposures)",
                     native_time=folded.native_time, bin_index=folded.bin_index,
@@ -253,4 +268,4 @@ def calc_probs_folded_fourier(target, folded, *, trilegal_fname=None, molusc_fil
     return _run(target, adapter, output_path=output_path, seed=seed, metadata=metadata,
                 trilegal_fname=trilegal_fname, molusc_file=molusc_file, N=N, steps=steps,
                 posterior_samples=posterior_samples, eb_eta=eb_eta, scenarios=scenarios,
-                missing_host_policy=missing_host_policy)
+                missing_host_policy=missing_host_policy, epoch_sigma=epoch_sigma)

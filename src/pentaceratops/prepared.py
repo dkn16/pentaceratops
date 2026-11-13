@@ -18,6 +18,7 @@ COMMON_DEFAULTS = dict(N=None, steps=None, seed=42, posterior_samples=2000,
                        parity="profile", eb_eta=1., missing_host_policy="error")
 COMMON_OPTIONS = set(COMMON_DEFAULTS) | {"nsamples", "scenarios", "filt"}
 REAL_OPTIONS = {"primary_only", "include_gp", "timing_policy"}
+FOURIER_OPTIONS = {"free_epoch", "epoch_sigma"}
 
 
 def _keys(mapping, allowed, label):
@@ -86,11 +87,13 @@ def _stellar_parameters(target, missing_host_policy):
 def _options(domain, settings):
     if domain not in ("real", "fourier"):
         raise ValueError("likelihood must be real or fourier")
-    allowed = COMMON_OPTIONS | (REAL_OPTIONS if domain == "real" else set())
+    allowed = COMMON_OPTIONS | (REAL_OPTIONS if domain == "real" else FOURIER_OPTIONS)
     _keys(settings, allowed, "settings")
     options = dict(COMMON_DEFAULTS, nsamples=20 if domain == "real" else 7)
     if domain == "real":
         options.update(primary_only=False, include_gp=True, timing_policy="observed")
+    else:
+        options.update(free_epoch=True, epoch_sigma=None)
     options.update(settings)
     for key in ("N", "steps", "nsamples", "posterior_samples"):
         if key in ("N", "steps") and options[key] is None:
@@ -111,6 +114,9 @@ def _options(domain, settings):
                 raise ValueError(f"{key} must be a boolean")
         if options["timing_policy"] not in ("observed", "legacy"):
             raise ValueError("timing_policy must be observed or legacy")
+    else:
+        from .evidence.joint_fourier import resolve_epoch_sigma
+        resolve_epoch_sigma(options["free_epoch"], options["epoch_sigma"])
     selected = options.get("scenarios")
     if selected is not None and (not isinstance(selected, (list, tuple)) or not selected
             or any(not isinstance(s, str) for s in selected)
@@ -124,7 +130,7 @@ def evidence(prepared, *, target, likelihood="real", N=None, steps=None, nsample
              seed=42, posterior_samples=2000, parity="profile", eb_eta=1.,
              trilegal_fname=None, molusc_file=None, filt=None, scenarios=None,
              missing_host_policy="error", primary_only=None, include_gp=None,
-             timing_policy=None, output_path=None):
+             timing_policy=None, free_epoch=None, epoch_sigma=None, output_path=None):
     """Return evidence, FPPs and posterior pools for preprocessed photometry.
 
     Import with ``from pentaceratops.evidence import evidence``. ``prepared``
@@ -145,12 +151,18 @@ def evidence(prepared, *, target, likelihood="real", N=None, steps=None, nsample
     Exposure subsamples default to 20 for Real or 7 for Fourier. Real-only
     primary_only/include_gp/timing_policy default to False/True/observed;
     supplying these for Fourier is an error. Use eb_eta=0.1 for the paper odds.
+
+    Fourier-only free_epoch (default True) samples a transit-time offset from the
+    supplied epoch in every scenario, with a zero-mean Gaussian prior of width
+    epoch_sigma in days (default 3 minutes). free_epoch=False fixes the epoch.
+    Supplying either for Real is an error: its epoch is always fixed.
     """
     settings = dict(N=N, steps=steps, seed=seed, posterior_samples=posterior_samples,
                     parity=parity, eb_eta=eb_eta, missing_host_policy=missing_host_policy)
     for key, value in (("nsamples", nsamples), ("filt", filt), ("scenarios", scenarios),
                        ("primary_only", primary_only), ("include_gp", include_gp),
-                       ("timing_policy", timing_policy)):
+                       ("timing_policy", timing_policy), ("free_epoch", free_epoch),
+                       ("epoch_sigma", epoch_sigma)):
         if value is not None:
             settings[key] = value
     options = _options(likelihood, settings)
@@ -243,7 +255,7 @@ def run_prepared(config_path, *, likelihood=None, output_path=None, **overrides)
     domain = config.get("likelihood", "real") if likelihood is None else likelihood
     if domain not in ("real", "fourier"):
         raise ValueError("likelihood must be real or fourier")
-    allowed = COMMON_OPTIONS | (REAL_OPTIONS if domain == "real" else set())
+    allowed = COMMON_OPTIONS | (REAL_OPTIONS if domain == "real" else FOURIER_OPTIONS)
     settings = config.get("settings", {})
     _keys(settings, allowed, "settings")
     _keys(overrides, allowed, "overrides")
