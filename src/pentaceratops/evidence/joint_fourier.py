@@ -18,12 +18,13 @@ FAMILIES=("TP","EB","EBx2P","PTP","PEB","PEBx2P","STP","SEB","SEBx2P",          
 DEFAULT_EPOCH_SIGMA=3./1440.  # days; default Gaussian prior width of the free transit-time offset
 
 
-def resolve_epoch_sigma(free_epoch=True, epoch_sigma=None):
+def resolve_epoch_sigma(free_epoch=False, epoch_sigma=None):
     """Prior width [days] of the transit-time offset, or None when the epoch is fixed.
 
-    The offset is one extra sampled parameter, transit time minus the supplied epoch, with a
-    zero-mean Gaussian prior. Supply the epoch uncertainty at the observed transits as
-    epoch_sigma; when omitted, DEFAULT_EPOCH_SIGMA (3 minutes) is used.
+    The epoch is fixed unless free_epoch=True. The offset is then one extra sampled parameter,
+    transit time minus the supplied epoch, with a zero-mean Gaussian prior. Supply the epoch
+    uncertainty at the observed transits as epoch_sigma; when omitted, DEFAULT_EPOCH_SIGMA
+    (3 minutes) is used.
     """
     if not isinstance(free_epoch,(bool,np.bool_)):raise ValueError("free_epoch must be a boolean")
     if not free_epoch:
@@ -107,7 +108,7 @@ def sample_joint_scenario(adapter, scenario, star, *, trilegal, molusc=None,
 
 def calc_probs_joint_fourier(target,P_orb,blocks,epoch,*,trilegal_fname=None,molusc_file=None,
                             N=500,steps=50,nsamples=7,seed=42,posterior_samples=2000,
-                            parity="profile",eb_eta=1.,filt=None,free_epoch=True,epoch_sigma=None):
+                            parity="profile",eb_eta=1.,filt=None,free_epoch=False,epoch_sigma=None):
     """Return all scenario Bayes factors/FPP and posterior records for one target.
 
     blocks contain observed flux and PSD covariance, constructed with

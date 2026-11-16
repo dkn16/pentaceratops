@@ -93,7 +93,7 @@ def _options(domain, settings):
     if domain == "real":
         options.update(primary_only=False, include_gp=True, timing_policy="observed")
     else:
-        options.update(free_epoch=True, epoch_sigma=None)
+        options.update(free_epoch=False, epoch_sigma=None)
     options.update(settings)
     for key in ("N", "steps", "nsamples", "posterior_samples"):
         if key in ("N", "steps") and options[key] is None:
@@ -152,10 +152,10 @@ def evidence(prepared, *, target, likelihood="real", N=None, steps=None, nsample
     primary_only/include_gp/timing_policy default to False/True/observed;
     supplying these for Fourier is an error. Use eb_eta=0.1 for the paper odds.
 
-    Fourier-only free_epoch (default True) samples a transit-time offset from the
-    supplied epoch in every scenario, with a zero-mean Gaussian prior of width
-    epoch_sigma in days (default 3 minutes). free_epoch=False fixes the epoch.
-    Supplying either for Real is an error: its epoch is always fixed.
+    Fourier-only free_epoch=True (default False) samples a transit-time offset
+    from the supplied epoch in every scenario, with a zero-mean Gaussian prior of
+    width epoch_sigma in days (default 3 minutes). Supplying either for Real is
+    an error: its epoch is always fixed.
     """
     settings = dict(N=N, steps=steps, seed=seed, posterior_samples=posterior_samples,
                     parity=parity, eb_eta=eb_eta, missing_host_policy=missing_host_policy)

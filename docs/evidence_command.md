@@ -160,7 +160,7 @@ Particle counts are effort settings, not evidence-convergence guarantees.
 
 The JSON also accepts `scenarios`, `parity`, `filt`, `missing_host_policy`, and,
 for Real, `primary_only`, `include_gp` and `timing_policy`. For Fourier it accepts
-`free_epoch` (default `true`) and `epoch_sigma` in days (default 3 minutes), the
+`free_epoch` (default `false`) and `epoch_sigma` in days (default 3 minutes), the
 Gaussian prior width of a sampled transit-time offset; see the
 [evidence API](evidence_api.md#arguments). Unknown or incompatible
 settings fail explicitly. Omit `scenarios` to run all eligible scenario families.

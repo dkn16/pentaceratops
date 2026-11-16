@@ -234,13 +234,13 @@ def calc_probs_folded_fourier(target, folded, *, trilegal_fname=None, molusc_fil
                               N=None, steps=None, nsamples=7, seed=42, posterior_samples=2000,
                               parity="profile", eb_eta=1., filt=None, scenarios=None,
                               missing_host_policy="error", output_path=None,
-                              free_epoch=True, epoch_sigma=None):
+                              free_epoch=False, epoch_sigma=None):
     """Return a RunResult for the full-orbit folded PSD likelihood.
 
-    By default every scenario also samples a transit-time offset from the supplied
-    epoch, with a zero-mean Gaussian prior of width epoch_sigma [days] (3 minutes
-    when omitted); eclipses of the same scenario move together. free_epoch=False
-    fixes the epoch. The table reports each scenario's posterior offset.
+    The epoch is fixed by default. With free_epoch=True every scenario also samples
+    a transit-time offset from the supplied epoch, with a zero-mean Gaussian prior of
+    width epoch_sigma [days] (3 minutes when omitted); eclipses of the same scenario
+    move together and the table reports each scenario's posterior offset.
 
     ``folded`` is FoldedFourierData, prepared once then optionally saved and
     memory-mapped. Physical predictions use every contributing native exposure.

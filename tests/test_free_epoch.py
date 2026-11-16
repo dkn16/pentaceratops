@@ -11,7 +11,8 @@ from test_joint_fourier import fixture
 
 
 def test_option_resolution():
-    assert resolve_epoch_sigma() == DEFAULT_EPOCH_SIGMA == pytest.approx(3/1440)
+    assert resolve_epoch_sigma() is None
+    assert resolve_epoch_sigma(True) == DEFAULT_EPOCH_SIGMA == pytest.approx(3/1440)
     assert resolve_epoch_sigma(True, .001) == .001
     assert resolve_epoch_sigma(False) is None
     for arguments in ((False, .001), (True, 0.), (True, -1.), (True, np.inf), (True, True), (1, None)):
@@ -74,13 +75,13 @@ def test_sampler_returns_offsets_and_restores_the_adapter(scenario):
     assert adapter.epoch_sigma is None and adapter.scalar_epoch_offset == 0.
 
 
-def test_public_options_default_on_for_fourier_and_rejected_for_real():
+def test_public_options_default_off_for_fourier_and_rejected_for_real():
     from pentaceratops.prepared import _options
     options = _options("fourier", {})
-    assert options["free_epoch"] is True and options["epoch_sigma"] is None
-    assert _options("fourier", dict(free_epoch=False))["free_epoch"] is False
-    assert _options("fourier", dict(epoch_sigma=.001))["epoch_sigma"] == .001
-    for settings in (dict(free_epoch=False, epoch_sigma=.001), dict(epoch_sigma=-1.), dict(free_epoch="yes")):
+    assert options["free_epoch"] is False and options["epoch_sigma"] is None
+    assert _options("fourier", dict(free_epoch=True))["free_epoch"] is True
+    assert _options("fourier", dict(free_epoch=True, epoch_sigma=.001))["epoch_sigma"] == .001
+    for settings in (dict(epoch_sigma=.001), dict(free_epoch=True, epoch_sigma=-1.), dict(free_epoch="yes")):
         with pytest.raises(ValueError):
             _options("fourier", settings)
     assert "free_epoch" not in _options("real", {})
