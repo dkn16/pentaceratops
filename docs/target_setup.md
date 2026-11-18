@@ -36,6 +36,37 @@ fractions, population provenance and CSV hashes. Access the returned table as
 as `target.trilegal_fname`. No CSV export or configuration file is required to
 pass this object to `evidence`.
 
+## What the target contains
+
+`target` is a small object with four attributes that `evidence` reads:
+
+| Attribute | Type | Contents |
+| --- | --- | --- |
+| `target.ID` | int | Catalogue identifier of the target star (TIC for TESS) |
+| `target.mission` | str | `"TESS"`, `"Kepler"` or `"K2"` |
+| `target.stars` | pandas DataFrame, one row per source | The stellar table, target first; see below |
+| `target.trilegal_fname` | str | Path to the background-population file |
+
+Fields made by `prepare_target` or reloaded by `load_target` also carry
+`target.stars_path` and `target.field_metadata`.
+
+`target.stars` needs these columns. Other columns, such as `ra` and `dec`, may
+be present.
+
+| Column | Type | Units | Needed for |
+| --- | --- | --- | --- |
+| `ID` | int | | Every row; unique |
+| `mass`, `rad` | float | Solar mass, solar radius | Every eligible host |
+| `Teff` | float | Kelvin | Every eligible host |
+| `Tmag` | float | Magnitude | Every eligible host |
+| `fluxratio` | float in `(0, 1]` | Fraction of the aperture light | Every eligible host |
+| `tdepth` | float | Fractional depth the signal would need on this star; `0` if it cannot host it | Every row; a positive value marks an eligible host |
+| `plx` | float | Milliarcseconds | The target only |
+| `Jmag`, `Hmag`, `Kmag` | float | Magnitude | The target only; may be `NaN` for neighbours |
+
+An example of the first rows is shown in
+[use your own light curve](guide/supplied_lightcurve.md#3-stellar-field-and-background-population).
+
 The original downloaded FITS files must be available at their saved paths.
 The dilution calculation uses the established 0.75-pixel Gaussian PSF and equal
 sector weighting; see [aperture geometry](aperture-geometry.md). The saved
@@ -83,17 +114,20 @@ that same historical row selection. They are not rewritten or reinterpreted.
 New downloads include two explicit footer records so all downloaded stellar
 rows reach the likelihood reader.
 
-Other keyword arguments are:
+All arguments of `prepare_target`:
 
-| Argument | Meaning |
-| --- | --- |
-| `stars` | A pandas DataFrame or CSV containing adopted stellar inputs; bypasses TIC. Include `ID, Tmag, Jmag, Hmag, Kmag, ra, dec, mass, rad, Teff, plx`. Dilution is recomputed from the science FITS. |
-| `transit_depth` | Optional measured **dimensionless aperture depth**, required if the saved bundle has no depth. For example, a 1000-ppm aperture depth is `0.001`. |
-| `search_radius=10` | TIC cone radius in TESS pixels, using the existing 20.25-arcsecond convention. |
-| `mag_lim=21` | Limiting magnitude sent to a new TRILEGAL query. |
-| `population_timeout=900` | Maximum seconds polling the result after the TRILEGAL form query. |
-| `poll_interval=10` | Seconds between result checks. |
-| `trilegal_verify_ssl=True` | Verify HTTPS certificates for TRILEGAL query and download. Set `False` explicitly only to work around a certificate failure; this does not change TIC or global SSL settings. |
+| Argument | Type | Meaning |
+| --- | --- | --- |
+| `prepared` | `RunResult` or path | The candidate preparation, or the path of its saved `.npz` file. |
+| `output_dir` | path | New directory for the field files; must not exist. |
+| `stars` | DataFrame or CSV path | Adopted stellar inputs; bypasses TIC. Include `ID, Tmag, Jmag, Hmag, Kmag, ra, dec, mass, rad, Teff, plx`. Dilution is recomputed from the science FITS. |
+| `trilegal_fname` | path | An existing TRILEGAL population for this sky position, used instead of a new query. |
+| `transit_depth` | float | Optional measured **dimensionless aperture depth**, required if the saved bundle has no depth. For example, a 1000-ppm aperture depth is `0.001`. |
+| `search_radius=10` | number | TIC cone radius in TESS pixels, using the existing 20.25-arcsecond convention. |
+| `mag_lim=21` | float | Limiting magnitude sent to a new TRILEGAL query. |
+| `population_timeout=900` | float | Maximum seconds polling the result after the TRILEGAL form query. |
+| `poll_interval=10` | float | Seconds between result checks. |
+| `trilegal_verify_ssl=True` | bool | Verify HTTPS certificates for TRILEGAL query and download. Set `False` explicitly only to work around a certificate failure; this does not change TIC or global SSL settings. |
 
 Supplied stellar inputs use solar mass/radius, kelvin, milliarcsecond parallax
 and RA/Dec degrees. All sources need coordinates and TESS magnitudes for

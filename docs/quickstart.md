@@ -86,6 +86,21 @@ print("FPP_EB  ", table.attrs["FPP_EB"])    # eclipsing-binary scenarios only
 print("NFPP    ", table.attrs["NFPP"])      # scenarios on resolved nearby stars
 ```
 
+For TOI-700.02 with the subtracted likelihood the first rows look like this
+(illustrative values; they depend on the data and settings):
+
+```text
+       ID scenario       lnBF         prob
+150428135       TP 107.348018 8.010272e-01
+150428135      PTP 105.257800 9.905508e-02
+150428135      DTP 104.782400 6.157627e-02
+150428135      STP 104.307135 3.828323e-02
+150428138      NEB  99.616407 3.514398e-05
+150428135      BEB  99.188726 2.291456e-05
+150428129      NEB  93.607116 8.630765e-08
+150428135      BTP  90.122704 2.647209e-08
+```
+
 Each row is one scenario on one star:
 
 | Column | Meaning |

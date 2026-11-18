@@ -62,6 +62,51 @@ per host star and scenario:
 `results.output.attrs` holds `FPP`, `FPP_EB`, `NFPP`, `scenario_scope` and the
 resolved settings of the run.
 
+As an example, this is TOI-700.02 with the subtracted likelihood, default
+sampling and `eb_eta=0.1`. The table has 33 rows: fifteen scenarios on the
+target (TIC 150428135) and three on each of six eligible neighbours. Sorted by
+probability, the first eight are:
+
+```python
+table = results.output
+print(table[["ID", "scenario", "lnBF", "prob"]].sort_values("prob", ascending=False).head(8))
+```
+
+```text
+       ID scenario       lnBF         prob
+150428135       TP 107.348018 8.010272e-01
+150428135      PTP 105.257800 9.905508e-02
+150428135      DTP 104.782400 6.157627e-02
+150428135      STP 104.307135 3.828323e-02
+150428138      NEB  99.616407 3.514398e-05
+150428135      BEB  99.188726 2.291456e-05
+150428129      NEB  93.607116 8.630765e-08
+150428135      BTP  90.122704 2.647209e-08
+```
+
+```python
+>>> {key: table.attrs[key] for key in ("FPP", "FPP_EB", "NFPP", "scenario_scope")}
+{'FPP': 0.0383, 'FPP_EB': 5.8e-05, 'NFPP': 3.5e-05, 'scenario_scope': 'all'}
+```
+
+Here the three planet-on-target scenarios (TP, PTP, DTP) hold 96 per cent of
+the probability, and almost all of the remaining 3.8 per cent is STP, a planet
+on an unresolved bound companion. The numbers illustrate the format; they
+depend on the preparation, the stellar field and the settings, and are not a
+published result.
+
+The record of one fit, here the planet on the target:
+
+```python
+>>> record = results.metadata["scenario_records"]["150428135:TP"]
+>>> record["weights"].shape                 # the whole sampler pool
+(1100,)
+>>> record["posterior_parameters"].shape    # 2000 equal-weight draws of 5 sampled coordinates
+(2000, 5)
+>>> float(np.median(record["physical_result"]["R_p"]))   # planet radius, Earth radii
+1.18
+```
+
 `results.metadata["scenario_records"]` maps `"<ID>:<scenario>"` to a dictionary
 for each fit:
 

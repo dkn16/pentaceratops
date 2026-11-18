@@ -31,11 +31,13 @@ package and its low-level scenario modules available.
 
 `prepared` can be any of these:
 
-| Input | Likelihood |
-| --- | --- |
-| The `RunResult` returned by `prepare_candidate`, or its saved `.npz` path | Real or Fourier |
-| The dictionary returned by `load_folded_real` | Real |
-| A `FoldedFourierData` object, or its saved directory | Fourier |
+| Input | Python type | Likelihood |
+| --- | --- | --- |
+| The result returned by `prepare_candidate`, or its saved `.npz` path | `RunResult`, or `str`/`Path` | Real or Fourier |
+| The dictionary returned by `load_folded_real` | `dict` of arrays | Real |
+| A folded Fourier object, or its saved directory | `FoldedFourierData`, or `str`/`Path` | Fourier |
+
+`evidence` works out which one it was given; there is no format argument.
 
 ## Reuse preprocessing that has already finished
 
@@ -102,7 +104,9 @@ The [target setup guide](target_setup.md) shows how to construct a new TESS
 field and save it, and how to load the field from an existing HZ run.
 
 `target` supplies `.mission`, `.stars` and `.trilegal_fname`; it can be an existing
-prepared `Target` or an object with those attributes. `.stars` is the in-memory
+prepared `Target` or an object with those attributes. The attributes, their
+types and the columns of the stellar table are listed under
+[what the target contains](target_setup.md#what-the-target-contains). `.stars` is the in-memory
 stellar DataFrame with the target first, then nearby sources. Its required
 columns are `ID, mass, rad, Teff, plx, Tmag, Jmag, Hmag, Kmag, tdepth, fluxratio`.
 `tdepth > 0` selects eligible hosts, and `fluxratio` is each host's aperture
