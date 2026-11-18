@@ -37,13 +37,46 @@ not repeat the PSD fit or query a catalog.
 Supply a list of dictionaries. Each dictionary represents one quarter, sector,
 or other observation segment with its own fitted variability model.
 
-| Block key | Required value | How it is used |
-| --- | --- | --- |
-| `time` | One-dimensional original timestamps in days, finite and strictly increasing within a block | Defines observations, transit cycles, even/odd assignments, and the regular grid used for PSD estimation |
-| `flux` | Matching normalized aperture flux, with the baseline near one | Supplies the observations for detrending and scenario comparisons |
-| `error` | Matching measurement uncertainties in the same flux units | Sets bin weights and contributes to noise estimation; do not include stellar-variability uncertainty a second time |
-| `exposure_seconds` | Positive exposure duration in seconds | Sets the lower bound on the common bin width and the approximate exposure response |
-| `segment` | Unique integer label | Identifies the saved segment and its noise-model state; a synthetic segment can use `1` |
+| Block key | Type and shape | Required value | How it is used |
+| --- | --- | --- | --- |
+| `time` | float array, shape `(n,)` | Original timestamps in days, finite and strictly increasing within a block | Defines observations, transit cycles, even/odd assignments, and the regular grid used for PSD estimation |
+| `flux` | float array, shape `(n,)` | Normalized aperture flux, with the baseline near one | Supplies the observations for detrending and scenario comparisons |
+| `error` | float array, shape `(n,)` | Measurement uncertainties in the same flux units | Sets bin weights and contributes to noise estimation; do not include stellar-variability uncertainty a second time |
+| `exposure_seconds` | float | Positive exposure duration in seconds | Sets the lower bound on the common bin width and the approximate exposure response |
+| `segment` | int | Unique label | Identifies the saved segment and its noise-model state; a synthetic segment can use `1` |
+
+Here `n` is the number of observations in that segment; the three arrays of a
+block have the same length, and different blocks may have different lengths.
+
+A complete, valid input built from scratch looks like this. It makes two
+27-day sectors of 10-minute data with a box-shaped transit, and runs as written:
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+period, t0, duration_hours, depth = 3.5, 1684.0, 2.4, 2e-3   # days, BTJD, hours, fraction
+
+blocks = []
+for segment, start in ((1, 1683.4), (2, 1711.4)):
+    time = start + np.arange(3900) * 10 / 1440                # BTJD, days
+    flux = 1 + 4e-4 * rng.standard_normal(time.size)          # normalized aperture flux
+    phase = (time - t0 + period / 2) % period - period / 2
+    flux[np.abs(phase) < duration_hours / 48] -= depth        # the transit
+    error = np.full(time.size, 4e-4)                          # same units as flux
+    blocks.append(dict(time=time, flux=flux, error=error,
+                       exposure_seconds=600.0, segment=segment))
+```
+
+Printing the type of each entry of `blocks[0]` gives:
+
+```text
+time              ndarray float64 (3900,)
+flux              ndarray float64 (3900,)
+error             ndarray float64 (3900,)
+exposure_seconds  float
+segment           int
+```
 
 For this candidate-preparation route, `time` must be mission-relative: BKJD
 (`BJD - 2454833`) for Kepler, or BTJD (`BJD - 2457000`) for TESS. The candidate
@@ -77,15 +110,35 @@ replacement for the flux-error array or noise covariance.
 
 Construct `pentaceratops.preprocessing.catalog.Candidate` with these fields:
 
-| Field | Units / requirement | How it is used |
-| --- | --- | --- |
-| `mission` | `"Kepler"` or `"TESS"` for this example | Sets the time zero; the matching target mission also selects the limb-darkening bandpass |
-| `host_id` | Positive integer, matching `target.ID` and the first stellar row | Checks that photometry and stellar field belong together |
-| `identifier` | Descriptive string, e.g. `"injection-001"` | Labels the preparation; it need not be a catalog planet identifier |
-| `period_days` | Positive candidate period in days | Sets folding, transit-cycle labels, and the orbital period used by the scenarios |
-| `epoch_bjd` | Primary-event reference epoch in full BJD | Centers the transit windows and folding operator |
-| `duration_hours` | Positive event duration in hours | Defines protected training windows and the extracted windows; scenario model durations are fitted, not fixed to this value |
-| `depth_ppm` | Optional depth in parts per million | Records a depth estimate; setting it does not automatically calculate dilution or update a supplied stellar field |
+| Field | Type | Units / requirement | How it is used |
+| --- | --- | --- | --- |
+| `mission` | str | `"Kepler"` or `"TESS"` for this example | Sets the time zero; the matching target mission also selects the limb-darkening bandpass |
+| `host_id` | int | Positive, matching `target.ID` and the first stellar row | Checks that photometry and stellar field belong together |
+| `identifier` | str | Descriptive, e.g. `"injection-001"` | Labels the preparation; it need not be a catalog planet identifier |
+| `period_days` | float | Positive candidate period in days | Sets folding, transit-cycle labels, and the orbital period used by the scenarios |
+| `epoch_bjd` | float | Primary-event reference epoch in full BJD | Centers the transit windows and folding operator |
+| `duration_hours` | float | Positive event duration in hours | Defines protected training windows and the extracted windows; scenario model durations are fitted, not fixed to this value |
+| `depth_ppm` | float or `None` | Optional depth in parts per million | Records a depth estimate; setting it does not automatically calculate dilution or update a supplied stellar field |
+
+For the synthetic light curve above:
+
+```python
+from pentaceratops.preprocessing.catalog import Candidate
+
+candidate = Candidate(
+    mission="TESS", host_id=123456789, identifier="example-01",
+    period_days=period,
+    epoch_bjd=2457000.0 + t0,          # full BJD = BTJD + 2457000
+    duration_hours=duration_hours,
+    depth_ppm=1e6 * depth,
+)
+```
+
+Passing `blocks` and `candidate` to `preprocess_blocks` returns a dictionary
+with three entries: `windows` (the folded even, odd, secondary and combined
+primary windows as arrays `time_*`, `flux_*`, `err_*`), `segments` (one record
+per block with its grid, masks and fitted variability), and `stream` (the
+detrended observations of all blocks joined in time order).
 
 Use the period being tested by the detection/validation experiment. If a binary
 is detected at half its physical orbital period, supply that detected period;
@@ -104,15 +157,32 @@ Supply an object with `ID`, `mission`, `stars`, and `trilegal_fname`, as in the
 example below. `stars` is a pandas table with the target first, followed by
 nearby sources. All IDs must be unique positive integers.
 
-| Column / input | Meaning | Where it enters |
-| --- | --- | --- |
-| `mass`, `rad` | Stellar mass and radius in solar units | Physical eclipse/transit models and stellar relations |
-| `Teff` | Effective temperature in kelvin | Limb darkening and stellar-model inputs |
-| `plx` | Parallax in milliarcseconds | Companion/background scenario calculations |
-| `Tmag`, `Jmag`, `Hmag`, `Kmag` | Adopted apparent magnitudes; `Tmag` is the column name required by the current interface, including Kepler fields | Photometric constraints and companion/background scenarios |
-| `fluxratio` | Each source's fraction of the total aperture light | Dilutes that source's modeled signal into the observed flux frame |
-| `tdepth` | Required fractional eclipse depth on that source | A positive value makes the host eligible for scenario fitting; zero excludes it |
-| `trilegal_fname` | Path to a prepared TRILEGAL population for this sky field | Supplies background-star scenarios |
+| Column / input | Type | Meaning | Where it enters |
+| --- | --- | --- | --- |
+| `ID` | int | Catalogue identifier (TIC or KIC), unique per row | Labels the host of each scenario; the first row must be the target |
+| `mass`, `rad` | float | Stellar mass and radius in solar units | Physical eclipse/transit models and stellar relations |
+| `Teff` | float | Effective temperature in kelvin | Limb darkening and stellar-model inputs |
+| `plx` | float | Parallax in milliarcseconds | Companion/background scenario calculations |
+| `Tmag`, `Jmag`, `Hmag`, `Kmag` | float | Adopted apparent magnitudes; `Tmag` is the column name required by the current interface, including Kepler fields | Photometric constraints and companion/background scenarios |
+| `fluxratio` | float in `(0, 1]` | Each source's fraction of the total aperture light | Dilutes that source's modeled signal into the observed flux frame |
+| `tdepth` | float | Required fractional eclipse depth on that source | A positive value makes the host eligible for scenario fitting; zero excludes it |
+| `trilegal_fname` | path | A prepared TRILEGAL population for this sky field | Supplies background-star scenarios |
+
+`stars` has one row per source in or near the aperture. The first rows of a
+real field (TOI-700) look like this; the target comes first, the next two rows
+are neighbours faint enough in the aperture that only a deep eclipse on them
+could produce the signal, and the last two cannot produce it at all:
+
+```text
+       ID   mass    rad   Teff     plx    Tmag   Jmag   Hmag   Kmag  tdepth  fluxratio
+150428135 0.4133 0.4195 3494.0 32.0980 10.9102  9.469  8.893  8.634  0.0007     0.9880
+736940566 0.8000 0.6706 4895.0  0.0552 18.1912    NaN    NaN    NaN  0.5781     0.0011
+150428138 1.0200 0.8908 5717.0  0.2297 17.0941 16.355 16.166 15.374  0.2129     0.0031
+736940567 1.0000 1.0000 4710.0  0.6131 19.8117    NaN    NaN    NaN  0.0000     0.0002
+736940542 1.0000 1.0000 5777.0 -0.1131 20.3420    NaN    NaN    NaN  0.0000     0.0001
+```
+
+Extra columns, such as `ra` and `dec`, are allowed and ignored by `evidence`.
 
 Eligible hosts need finite, positive mass, radius, and temperature, a finite
 `Tmag`, and `0 < fluxratio <= 1`. The target also needs finite parallax and
