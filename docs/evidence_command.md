@@ -30,7 +30,7 @@ The equivalent command without the installed executable is
 an editable installation, prefix it with `PYTHONPATH=src`. The Python interface
 is `pentaceratops.run_prepared("target.json")`, returning a `RunResult`.
 
-Copy [examples/evidence.json](../examples/evidence.json) to `target.json` and
+Copy [examples/evidence.json](https://github.com/dkn16/pentaceratops/blob/main/examples/evidence.json) to `target.json` and
 replace its example ID and file paths with your actual inputs. All paths inside
 the JSON are relative to that JSON file, so it can be launched from any directory.
 The command performs no catalog query, download, PSD estimation or detrending fit.

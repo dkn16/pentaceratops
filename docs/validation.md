@@ -91,7 +91,7 @@ integration count, not convergence of that count or full benchmark equivalence.
 
 ## Download/preparation examples: `0.1.0.dev2` (2026-09-29)
 
-The [candidate examples](../examples/README.md) default to NASA Exoplanet
+The [candidate examples](guide/candidate.md) default to NASA Exoplanet
 Archive ephemerides, with an explicitly selected Bayesian catalogue option
 for TESS. They prepare MAP-detrended windows, not all-scenario evidence or
 FGP-covariance likelihood inputs.

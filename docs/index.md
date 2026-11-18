@@ -1,0 +1,99 @@
+# Pentaceratops
+
+Pentaceratops estimates the **false-positive probability (FPP)** of a transiting
+planet candidate. It takes the candidate's light curve and the stars in and
+around the photometric aperture, fits eighteen competing astrophysical
+scenarios, and reports how probable each one is.
+
+It follows the scenario framework of
+[TRICERATOPS](https://github.com/stevengiacalone/triceratops)
+(Giacalone et al. 2021) and changes three parts of the calculation:
+
+- **More of the light curve is used.** Eclipsing-binary scenarios are tested
+  against the secondary eclipse and against the difference between even and odd
+  transits, not only the primary transit.
+- **Stellar variability can be marginalized.** In addition to the usual
+  likelihood on a detrended light curve, a second likelihood integrates over a
+  Gaussian model of the variability described by its power spectrum.
+- **Evidence comes from persistent sampling.** Each scenario's Bayesian evidence
+  is estimated with a tempered particle sampler, which also returns posterior
+  samples of the physical parameters.
+
+!!! warning "Development version"
+    The current version is `0.1.0.dev14`. Interfaces can still change, the
+    default sampling settings are provisional, and the accompanying paper is in
+    preparation. Check the [sampling notes](concepts/sampling.md) before
+    relying on an individual FPP.
+
+## A complete run in three calls
+
+```python
+from pentaceratops import prepare_target
+from pentaceratops.preprocessing.candidate import prepare_candidate
+from pentaceratops.evidence import evidence
+
+# 1. Download, detrend and fold the light curve.
+prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
+
+# 2. Build the stellar field: nearby stars, aperture dilution, background population.
+target = prepare_target(prepared, output_dir="/path/to/new_field")
+
+# 3. Fit every scenario and combine them into an FPP.
+results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+
+print(results.output[["ID", "scenario", "lnBF", "prob"]])
+print("FPP:", results.output.attrs["FPP"])
+```
+
+The [quick start](quickstart.md) walks through these calls, what they need, and
+how to read the result.
+
+## What you need
+
+| Input | Where it comes from |
+| --- | --- |
+| Light curve | Downloaded for a TOI or KOI by `prepare_candidate`, or [your own arrays](guide/supplied_lightcurve.md) |
+| Ephemeris (period, epoch, duration) | NASA Exoplanet Archive by default, or values you supply |
+| Stellar field and aperture dilution | `prepare_target` for TESS, or a [table you supply](target_setup.md) |
+| Background-star population | A TRILEGAL query made by `prepare_target`, or an existing file |
+
+Building a new stellar field with `prepare_target` currently supports **TESS**.
+Kepler candidates run through the same evidence calculation with a supplied
+stellar table and population.
+
+## Where to go next
+
+<div class="grid cards" markdown>
+
+- **[Installation](install.md)**
+
+    Requirements, optional extras and a dependency check.
+
+- **[Quick start](quickstart.md)**
+
+    One TESS candidate from identifier to FPP.
+
+- **[Scenarios and the FPP](concepts/scenarios.md)**
+
+    The eighteen scenarios and how they combine into a probability.
+
+- **[The two likelihoods](concepts/likelihoods.md)**
+
+    Subtracted and marginalized likelihoods, and when to use each.
+
+- **[Options](reference/options.md)**
+
+    Every setting of the evidence calculation in one table.
+
+- **[Use your own light curve](guide/supplied_lightcurve.md)**
+
+    Observed or injected photometry that is already on disk.
+
+</div>
+
+## Citing
+
+A paper describing the method is in preparation. Until it is available, please
+cite the repository and TRICERATOPS:
+
+- Giacalone, S., Dressing, C. D., Jensen, E. L. N., et al. 2021, AJ, 161, 24

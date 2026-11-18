@@ -4,6 +4,11 @@ Statistical validation of transiting planet candidates using competing planet
 and eclipsing-binary scenarios, real-space or Fourier-space likelihoods, and
 persistent sampling.
 
+**Documentation:** start with the [overview](docs/index.md), the
+[quick start](docs/quickstart.md) and the [options reference](docs/reference/options.md).
+The same pages build into a website with `mkdocs serve`; see
+[developer workflow](docs/development.md#documentation-site).
+
 **Development version: `0.1.0.dev14`.** Run evidence directly from Python:
 
 ```python
@@ -100,7 +105,7 @@ Load that file as `prepared` or pass its path to `evidence`, along with your
 prepared stellar-field object. The evidence function propagates the saved FGP
 state into the appropriate Real or Fourier covariance. The scripts themselves
 only preprocess; their plotted errors include measurement errors only.
-See [examples and all options](examples/README.md).
+See [examples and all options](docs/guide/candidate.md).
 
 ## Run and save an evidence calculation
 

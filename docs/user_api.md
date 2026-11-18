@@ -35,7 +35,7 @@ the offline `run_prepared` / [evidence command](evidence_command.md),
 the recorded compatibility interfaces, and lower-level building blocks. Do not add placeholder `preprocess`, `validate`, or `report` functions
 that appear to run the corrected pipeline before that integration is complete.
 
-The [download/preparation examples](../examples/README.md) now implement an
+The [download/preparation examples](guide/candidate.md) now implement an
 initial, explicitly limited preparation stage. They default to NASA TOI/KOI
 ephemerides and allow the Bayesian catalogue for TESS. They do not yet provide
 the complete three-stage interface described below. Their saved bundles can

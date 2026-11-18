@@ -5,6 +5,8 @@ __pycache__/
 .ruff_cache/
 build/
 dist/
+# Built documentation site (mkdocs build).
+/site/
 .venv/
 # Match the local research symlink as well as a directory.
 /research

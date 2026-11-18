@@ -1,0 +1,130 @@
+# Documentation site. Build locally with:
+#   python -m pip install -e '.[docs]'
+#   mkdocs serve            # live preview at http://127.0.0.1:8000
+#   mkdocs build --strict   # what the GitHub Action runs
+site_name: Pentaceratops
+site_description: Statistical validation of transiting planet candidates
+site_url: https://dkn16.github.io/pentaceratops/
+repo_url: https://github.com/dkn16/pentaceratops
+repo_name: dkn16/pentaceratops
+edit_uri: edit/main/docs/
+docs_dir: docs
+
+# Repository records that are not site content: test reports, and two files that record local paths.
+# The remaining JSON/CSV validation records are published because pages link to them.
+exclude_docs: |
+  *.xml
+  source_manifest.json
+  trilegal-ssl-validation-20261005.json
+
+theme:
+  name: material
+  icon:
+    logo: material/orbit
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - toc.follow
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            heading_level: 3
+            separate_signature: true
+            show_signature_annotations: false
+            docstring_style: google
+            members_order: source
+            filters: ["!^_"]
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+validation:
+  omitted_files: info
+  absolute_links: info
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: install.md
+      - Quick start: quickstart.md
+  - Concepts:
+      - Scenarios and the FPP: concepts/scenarios.md
+      - The two likelihoods: concepts/likelihoods.md
+      - Sampling and convergence: concepts/sampling.md
+  - User guide:
+      - Prepare a candidate light curve: guide/candidate.md
+      - Use your own light curve: guide/supplied_lightcurve.md
+      - Stellar field and target: target_setup.md
+      - Run the evidence calculation: evidence_api.md
+      - Run from the command line: evidence_command.md
+      - Results and posterior records: results.md
+  - Reference:
+      - Options: reference/options.md
+      - Command line: reference/cli.md
+      - Python API: reference/api.md
+  - Technical notes:
+      - Likelihood-ready folded inputs: hz_runs.md
+      - Eclipse timing and coverage: timing.md
+      - Joint Fourier likelihood with gaps: joint_fourier.md
+      - Folded Fourier weighting: fourier_weighting.md
+      - Exposure integration: exposure.md
+      - Primary-only subtracted likelihood: primary-only-v2.md
+      - Aperture geometry: aperture-geometry.md
+  - Development:
+      - Developer workflow: development.md
+      - Architecture: architecture.md
+      - Planned three-stage interface: user_api.md
+      - PyTransit upgrade notes: pytransit.md
+      - Validation record: validation.md
+      - Timing, subtracted likelihood: evidence-defaults-benchmark-20261010.md
+      - Timing, marginalized likelihood: evidence-fourier-benchmark-20261010.md

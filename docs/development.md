@@ -81,6 +81,36 @@ command. `--junitxml /path/to/report.xml` retains a machine-readable test report
 `python tools/audit_source.py` checks the original imported source files against
 their extraction hashes without modifying them.
 
+## Documentation site
+
+The site is built with MkDocs from the Markdown files in `docs/`; `mkdocs.yml`
+holds the navigation. The Python API page is generated from docstrings by
+static analysis of `src/`, so the package's scientific dependencies are not
+needed to build it.
+
+```bash
+python -m pip install -e '.[docs]'
+mkdocs serve            # live preview at http://127.0.0.1:8000
+mkdocs build --strict   # the check run by the GitHub Action; warnings are errors
+```
+
+On a remote machine, forward the port (`ssh -L 8000:localhost:8000 host`) to view
+the preview in a local browser. The built site goes to `site/`, which Git
+ignores.
+
+- A new page must be added to `nav` in `mkdocs.yml`.
+- Link to other pages with relative paths to their `.md` files. Links to files
+  outside `docs/` (source code, example scripts) must be full repository URLs,
+  or the strict build fails.
+- JSON and CSV files in `docs/` are validation records that pages link to. Test
+  reports (`*.xml`) and records containing local paths are listed under
+  `exclude_docs` in `mkdocs.yml` and are not published; add any new file of that
+  kind there.
+
+`.github/workflows/docs.yml` builds the site on every change that touches it.
+Publishing to GitHub Pages happens from `main` only, and only after it has been
+enabled in the repository settings as described at the top of that file.
+
 ## Compatibility constraints
 
 - Current tests use Python 3.13; the PyTransit upgrade is tested in a separate

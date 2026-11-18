@@ -165,7 +165,7 @@ Do this before PSD estimation, detrending, or folding. Do not apply it again to
 an already-restored cache. PSD/covariance scales quadratically. Normalized SAP
 uses restoration factor one. Missing flux provenance should not be guessed.
 
-The [candidate examples](../examples/README.md) implement sector selection,
+The [candidate examples](guide/candidate.md) implement sector selection,
 other-planet masking, matched protection/input windows, binning, and explicit
 coverage gates. They are not a complete TIC-to-FPP runner or a reproduction
 of every historical research preprocessor. They retain MAP state, but do not

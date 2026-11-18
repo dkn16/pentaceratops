@@ -63,7 +63,7 @@ It becomes an approximate rectangular exposure duration for the folded models.
 The array route assumes aperture-normalized flux and errors. It does not inspect
 FITS headers or restore a crowding correction for you. For normalized PDCSAP
 data, use the actual product's crowding factor to restore the aperture frame
-once, before injection/preprocessing. See [flux normalization](../src/pentaceratops/preprocessing/flux.py).
+once, before injection/preprocessing. See [flux normalization](https://github.com/dkn16/pentaceratops/blob/main/src/pentaceratops/preprocessing/flux.py).
 Already restored aperture data should not be corrected again.
 
 For an isolated synthetic source, `fluxratio=1` is consistent with a model
@@ -133,7 +133,7 @@ experiment; its FPP is conditional on those assumptions. A placeholder or
 empty TRILEGAL file is not a valid all-scenario input. The current `evidence()`
 wrapper requires a population file even when selecting a scenario subset.
 
-See [target setup](../docs/target_setup.md) for acquiring or reloading field
+See [target setup](../target_setup.md) for acquiring or reloading field
 inputs. `prepare_target()` currently constructs new fields from original TESS
 science FITS files and their apertures. An array-only bundle has no such
 products: use an adopted field rather than inventing FITS paths or download
@@ -267,8 +267,8 @@ even/odd/secondary data. The marginalized path uses the saved normalized raw
 flux and full PSD covariance, folding all observed phases at twice the
 candidate period. The same folding operator acts on data, covariance, and
 model predictions. Measurement noise is included by these routines; do not
-add it again to the returned covariance. See [folded inputs](../docs/hz_runs.md)
-and the [evidence API](../docs/evidence_api.md) for the complete options.
+add it again to the returned covariance. See [folded inputs](../hz_runs.md)
+and the [evidence API](../evidence_api.md) for the complete options.
 
 ## 6. If the injection output is already folded
 
@@ -308,7 +308,7 @@ regular-grid bins). Missing window bins produce an error; they are not filled.
 Adjust coverage or bin/window choices explicitly. An explicitly prepared
 `FoldedFourierData` object can represent incomplete orbital coverage without
 requiring a secondary window; see the direct preparation route in
-[folded inputs](../docs/hz_runs.md#full-orbit-folded-fourier-inference).
+[folded inputs](../hz_runs.md#full-orbit-folded-fourier-inference).
 
 Protection during this preprocessing is centered at the primary epoch and P/2.
 It is not a search for an eccentric secondary. Check where the injected

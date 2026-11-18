@@ -1,0 +1,65 @@
+# Build the documentation site on every change, and publish it to GitHub Pages from main.
+#
+# Publishing is off until it is switched on in the repository settings:
+#   1. Settings -> Pages -> Build and deployment -> Source: "GitHub Actions"
+#   2. Settings -> Secrets and variables -> Actions -> Variables: PUBLISH_DOCS = true
+# Without step 2 the site is still built and checked, but nothing is published.
+name: docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "src/**"
+      - "pyproject.toml"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "src/**"
+      - "pyproject.toml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install the package with the docs extra
+        run: python -m pip install -e '.[docs]'
+      - name: Build (warnings are errors)
+        run: mkdocs build --strict
+      - name: Upload the site
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.PUBLISH_DOCS == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.PUBLISH_DOCS == 'true'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

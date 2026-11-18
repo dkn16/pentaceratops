@@ -43,6 +43,41 @@ first returned row. Such an array is not an entirely unbiased equal-weight
 posterior sample. Full pools avoid losing weights or confusing that first row
 with a random draw.
 
+## Scenario table and records
+
+The high-level interfaces (`evidence`, `calc_probs_folded_real`,
+`calc_probs_folded_fourier`) return a table in `results.output` with one row
+per host star and scenario:
+
+| Column | Meaning |
+| --- | --- |
+| `ID`, `scenario` | Host star and scenario label |
+| `lnBF` | Log Bayes factor against a flat light curve for the same data; the unweighted evidence used for probabilities |
+| `lnZ`, `null_loglike` | `lnBF` plus the log-likelihood of the flat model, and that log-likelihood |
+| `aperture_fraction` | Fraction of the aperture light contributed by the host |
+| `seed`, `sampling_N`, `sampling_steps` | Random seed and sampling effort used for this row |
+| `prob`, `eta` | Scenario probability, and the `eb_eta` weight applied to the row |
+| `epoch_offset`, `epoch_offset_err` | Only with `free_epoch=True`: posterior mean and standard deviation of the transit-time offset, in days |
+
+`results.output.attrs` holds `FPP`, `FPP_EB`, `NFPP`, `scenario_scope` and the
+resolved settings of the run.
+
+`results.metadata["scenario_records"]` maps `"<ID>:<scenario>"` to a dictionary
+for each fit:
+
+| Key | Contents |
+| --- | --- |
+| `physical_parameters`, `weights`, `log_target` | The complete sampler pool: sampled coordinates, normalized importance weights, and the log target of each particle |
+| `posterior_parameters`, `posterior_log_target`, `posterior_source_index` | Equal-weight draws from that pool (`posterior_samples` of them) and their row indices in the pool |
+| `physical_result` | Named physical quantities of the resampled posterior, such as `R_p`, `inc`, `ecc`, `argp`, `b`, `M_EB`, `R_EB` |
+| `bestfit` | The highest-target particle: its named `parameters`, its `model` light curve, and an independent re-evaluation (`scalar_replay`) that must agree with the sampler's value |
+| `epoch_offset`, `posterior_epoch_offset` | Only with `free_epoch=True`: the offset of every pool particle and of every posterior draw, in days |
+| `lnBF`, `lnZ`, `seed`, `N`, `steps`, `sampling_stats` | The evidence and how it was obtained |
+
+Angles are in degrees, `R_p` in Earth radii and stellar quantities in solar
+units. `argp` is the stored periastron angle; the transit model uses
+`90° - argp`.
+
 ## Storage
 
 `result.save(path)` writes one NPZ with numeric arrays and UTF-8 JSON metadata.
