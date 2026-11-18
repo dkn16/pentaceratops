@@ -75,16 +75,98 @@ def test_sampler_returns_offsets_and_restores_the_adapter(scenario):
     assert adapter.epoch_sigma is None and adapter.scalar_epoch_offset == 0.
 
 
-def test_public_options_default_off_for_fourier_and_rejected_for_real():
+def test_public_options_default_off_for_both_likelihoods():
     from pentaceratops.prepared import _options
-    options = _options("fourier", {})
-    assert options["free_epoch"] is False and options["epoch_sigma"] is None
-    assert _options("fourier", dict(free_epoch=True))["free_epoch"] is True
-    assert _options("fourier", dict(free_epoch=True, epoch_sigma=.001))["epoch_sigma"] == .001
-    for settings in (dict(epoch_sigma=.001), dict(free_epoch=True, epoch_sigma=-1.), dict(free_epoch="yes")):
-        with pytest.raises(ValueError):
-            _options("fourier", settings)
-    assert "free_epoch" not in _options("real", {})
-    for settings in (dict(free_epoch=True), dict(epoch_sigma=.001)):
-        with pytest.raises(ValueError):
-            _options("real", settings)
+    for domain in ("fourier", "real"):
+        options = _options(domain, {})
+        assert options["free_epoch"] is False and options["epoch_sigma"] is None
+        assert _options(domain, dict(free_epoch=True))["free_epoch"] is True
+        assert _options(domain, dict(free_epoch=True, epoch_sigma=.001))["epoch_sigma"] == .001
+        for settings in (dict(epoch_sigma=.001), dict(free_epoch=True, epoch_sigma=-1.), dict(free_epoch="yes")):
+            with pytest.raises(ValueError):
+                _options(domain, settings)
+
+
+@pytest.mark.parametrize("primary_only", [False, True])
+def test_subtracted_likelihood_batched_offsets_match_the_scalar_reference(monkeypatch, primary_only):
+    import importlib
+    from pentaceratops.hz import real_adapter
+    from pentaceratops.experimental.covariance import scenario_functions, patched_engine
+    from pentaceratops.evidence import real, eclipses
+    from test_all_scenarios import population
+    from test_exposure import synthetic_data
+    from test_hz import target
+    data = synthetic_data()
+    if primary_only:
+        n = len(data["even_time"])+len(data["odd_time"])
+        for key in ("time", "mean_flux", "sigma"):
+            data["secondary_"+key] = np.empty(0)
+        for key in ("flux", "sigma", "map_flux", "factor"):
+            data[key] = data[key][:n]
+    adapter = real_adapter(data, mission="TESS", primary_only=primary_only, nsamples=7)
+    monkeypatch.setattr(real, "trilegal_results", population)
+    monkeypatch.setattr(eclipses, "trilegal_results", population)
+    class Capture(BaseException):
+        pass
+    moved = 0
+    for name, function in scenario_functions().items():
+        module = importlib.import_module(function.__module__)
+        kwargs = adapter.scenario_kwargs(function, target().stars.iloc[0], trilegal="unused")
+        saved = {}
+        def capture(like, prior, ndim, **options):
+            saved.update(like=like, prior=prior, ndim=ndim)
+            raise Capture()
+        with monkeypatch.context() as patch:
+            patch.setattr(module, "_run_persistent_evidence", capture)
+            with patched_engine(adapter), pytest.raises(Capture):
+                function(**kwargs)
+        rng = np.random.default_rng(902)
+        cube = rng.uniform(.02, .9, (12, saved["ndim"]))
+        cube[:, 1] = .99999999
+        cube[:, 2] = .02
+        physical = np.array([saved["prior"](u) for u in cube])
+        offsets = rng.normal(0., .004, len(physical))
+        offsets[0] = 0.
+        with patched_engine(adapter):
+            fixed = adapter.likelihood_batch(saved["like"], physical)
+            scalar = []
+            for row, offset in zip(physical, offsets):
+                adapter.scalar_epoch_offset = float(offset)
+                try: scalar.append(saved["like"](row))
+                finally: adapter.scalar_epoch_offset = 0.
+            adapter.epoch_sigma = .004
+            try: batch = adapter.likelihood_batch(saved["like"], np.column_stack([physical, offsets]))
+            finally: adapter.epoch_sigma = None
+            again = np.array([saved["like"](row) for row in physical])
+        scalar = np.array(scalar)
+        assert np.isfinite(scalar).any(), name
+        np.testing.assert_allclose(batch, scalar, atol=2e-5, rtol=2e-12)
+        assert batch[0] == pytest.approx(fixed[0], abs=1e-9) or not np.isfinite(fixed[0])
+        # The scalar reference is unchanged once the offset is cleared (no stale model times).
+        np.testing.assert_allclose(again, fixed, atol=2e-5, rtol=2e-12)
+        both = np.isfinite(batch) & np.isfinite(fixed)
+        moved += int(np.sum(abs(batch[both]-fixed[both]) > 1e-6))
+    assert moved > 0
+
+
+def test_public_subtracted_run_with_a_free_epoch(tmp_path):
+    from pentaceratops import calc_probs_folded_real
+    from test_exposure import synthetic_data
+    from test_hz import target
+    data = synthetic_data()
+    for panel in ("even", "odd", "secondary"):
+        data[panel+"_sigma"][:] = .1
+    data["sigma"][:] = .1
+    common = dict(N=8, steps=2, nsamples=3, seed=307, posterior_samples=11, eb_eta=.1,
+                  scenarios=("TP", "EB", "EBx2P"))
+    fixed = calc_probs_folded_real(target(), data, **common)
+    assert "epoch_offset" not in fixed.output and fixed.output.attrs["free_epoch"] is False
+    result = calc_probs_folded_real(target(), data, free_epoch=True, epoch_sigma=.002, **common)
+    table = result.output
+    assert table.attrs["free_epoch"] is True and table.attrs["epoch_sigma"] == .002
+    assert np.isfinite(table.epoch_offset).all() and np.all(table.epoch_offset_err > 0)
+    for record in result.metadata["scenario_records"].values():
+        assert record["posterior_epoch_offset"].shape == (11,)
+        assert np.all(abs(record["epoch_offset"]) < 8*.002)
+        assert "epoch_offset" in record["bestfit"]["parameters"]
+        assert record["bestfit"]["scalar_replay"] == pytest.approx(record["bestfit"]["log_target"], abs=2e-5)

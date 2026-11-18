@@ -179,7 +179,7 @@ likelihood-ready Real preparation and cannot discard a candidate bundle's
 secondary observations. Use `timing_policy="legacy"` for the archived Real
 timing rule. The existing ordinary-EB secondary penalty remains unchanged.
 
-Fourier-only options are `free_epoch` and `epoch_sigma`. The epoch is fixed by
+`free_epoch` and `epoch_sigma` apply to both likelihoods. The epoch is fixed by
 default. With `free_epoch=True` every scenario samples one extra parameter, the transit time
 minus the supplied epoch, with a zero-mean Gaussian prior; all eclipses of a
 scenario move together. `epoch_sigma` is the prior width in days and should be
@@ -190,8 +190,9 @@ With a fixed epoch a timing error of about a minute is absorbed by eccentricity
 at high SNR, so consider `free_epoch=True` for high-SNR candidates.
 The table gains `epoch_offset` and `epoch_offset_err` columns (posterior mean
 and standard deviation in days) and the records keep the offset samples as
-`epoch_offset` and `posterior_epoch_offset`. These options are rejected for
-Real, whose epoch is always fixed.
+`epoch_offset` and `posterior_epoch_offset`. For Real, the offset moves the
+modelled eclipses; the window-support tests and the centred no-secondary
+constraint keep their fixed-epoch form.
 
 Omit `scenarios` for all eligible hypotheses. An explicit subset produces a
 conditional FPP. The sampler settings are effort controls, not a convergence

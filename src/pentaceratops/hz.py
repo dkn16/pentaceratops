@@ -201,8 +201,14 @@ def calc_probs_folded_real(target, data, *, trilegal_fname=None, molusc_file=Non
                            N=None, steps=None, nsamples=20, seed=42, posterior_samples=2000,
                            parity="profile", eb_eta=1., primary_only=False, include_gp=True,
                            filt=None, scenarios=None, missing_host_policy="error", output_path=None,
-                           timing_policy="observed"):
+                           timing_policy="observed", free_epoch=False, epoch_sigma=None):
     """Return a RunResult for folded Real data using the optimized HZ likelihood.
+
+    The epoch is fixed by default. With free_epoch=True every scenario also samples
+    a transit-time offset from the supplied epoch, with a zero-mean Gaussian prior of
+    width epoch_sigma [days] (3 minutes when omitted); eclipses of the same scenario
+    move together, while the window-support tests and the centred no-secondary
+    constraint keep their fixed-epoch form.
 
     Inputs are the dictionaries returned by load_folded_real. The loader retains the
     HZ per-panel median measurement errors and cross-panel trend covariance.
@@ -216,6 +222,7 @@ def calc_probs_folded_real(target, data, *, trilegal_fname=None, molusc_file=Non
     """
     if output_path is not None:
         RunResult.check_destination(output_path)
+    epoch_sigma = resolve_epoch_sigma(free_epoch, epoch_sigma)
     adapter = real_adapter(data, mission=_mission(target), filt=filt,
                            primary_only=primary_only, include_gp=include_gp,
                            parity=parity, nsamples=nsamples, timing_policy=timing_policy)
@@ -223,12 +230,13 @@ def calc_probs_folded_real(target, data, *, trilegal_fname=None, molusc_file=Non
                     exptime=float(data["exptime"]), primary_only=bool(primary_only),
                     include_gp=bool(include_gp), time_convention="panel offsets in days",
                     timing_policy=timing_policy,
+                    free_epoch=epoch_sigma is not None, epoch_sigma=epoch_sigma,
                     observation_time=np.concatenate([data[p + "_time"] for p in PANELS]),
                     observation_flux=adapter.metric.flux.copy())
     return _run(target, adapter, output_path=output_path, seed=seed, metadata=metadata,
                 trilegal_fname=trilegal_fname, molusc_file=molusc_file, N=N, steps=steps,
                 posterior_samples=posterior_samples, eb_eta=eb_eta, scenarios=scenarios,
-                missing_host_policy=missing_host_policy)
+                missing_host_policy=missing_host_policy, epoch_sigma=epoch_sigma)
 
 
 def calc_probs_folded_fourier(target, folded, *, trilegal_fname=None, molusc_file=None,

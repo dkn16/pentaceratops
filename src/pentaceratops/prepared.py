@@ -15,10 +15,10 @@ from .sampling.records import snapshot
 
 
 COMMON_DEFAULTS = dict(N=None, steps=None, seed=42, posterior_samples=2000,
-                       parity="profile", eb_eta=1., missing_host_policy="error")
+                       parity="profile", eb_eta=1., missing_host_policy="error",
+                       free_epoch=False, epoch_sigma=None)
 COMMON_OPTIONS = set(COMMON_DEFAULTS) | {"nsamples", "scenarios", "filt"}
 REAL_OPTIONS = {"primary_only", "include_gp", "timing_policy"}
-FOURIER_OPTIONS = {"free_epoch", "epoch_sigma"}
 
 
 def _keys(mapping, allowed, label):
@@ -87,13 +87,11 @@ def _stellar_parameters(target, missing_host_policy):
 def _options(domain, settings):
     if domain not in ("real", "fourier"):
         raise ValueError("likelihood must be real or fourier")
-    allowed = COMMON_OPTIONS | (REAL_OPTIONS if domain == "real" else FOURIER_OPTIONS)
+    allowed = COMMON_OPTIONS | (REAL_OPTIONS if domain == "real" else set())
     _keys(settings, allowed, "settings")
     options = dict(COMMON_DEFAULTS, nsamples=20 if domain == "real" else 7)
     if domain == "real":
         options.update(primary_only=False, include_gp=True, timing_policy="observed")
-    else:
-        options.update(free_epoch=False, epoch_sigma=None)
     options.update(settings)
     for key in ("N", "steps", "nsamples", "posterior_samples"):
         if key in ("N", "steps") and options[key] is None:
@@ -114,9 +112,8 @@ def _options(domain, settings):
                 raise ValueError(f"{key} must be a boolean")
         if options["timing_policy"] not in ("observed", "legacy"):
             raise ValueError("timing_policy must be observed or legacy")
-    else:
-        from .evidence.joint_fourier import resolve_epoch_sigma
-        resolve_epoch_sigma(options["free_epoch"], options["epoch_sigma"])
+    from .evidence.joint_fourier import resolve_epoch_sigma
+    resolve_epoch_sigma(options["free_epoch"], options["epoch_sigma"])
     selected = options.get("scenarios")
     if selected is not None and (not isinstance(selected, (list, tuple)) or not selected
             or any(not isinstance(s, str) for s in selected)
@@ -152,10 +149,9 @@ def evidence(prepared, *, target, likelihood="real", N=None, steps=None, nsample
     primary_only/include_gp/timing_policy default to False/True/observed;
     supplying these for Fourier is an error. Use eb_eta=0.1 for the paper odds.
 
-    Fourier-only free_epoch=True (default False) samples a transit-time offset
-    from the supplied epoch in every scenario, with a zero-mean Gaussian prior of
-    width epoch_sigma in days (default 3 minutes). Supplying either for Real is
-    an error: its epoch is always fixed.
+    free_epoch=True (default False) samples a transit-time offset from the
+    supplied epoch in every scenario, with a zero-mean Gaussian prior of width
+    epoch_sigma in days (default 3 minutes). It applies to both likelihoods.
     """
     settings = dict(N=N, steps=steps, seed=seed, posterior_samples=posterior_samples,
                     parity=parity, eb_eta=eb_eta, missing_host_policy=missing_host_policy)
@@ -255,7 +251,7 @@ def run_prepared(config_path, *, likelihood=None, output_path=None, **overrides)
     domain = config.get("likelihood", "real") if likelihood is None else likelihood
     if domain not in ("real", "fourier"):
         raise ValueError("likelihood must be real or fourier")
-    allowed = COMMON_OPTIONS | (REAL_OPTIONS if domain == "real" else FOURIER_OPTIONS)
+    allowed = COMMON_OPTIONS | (REAL_OPTIONS if domain == "real" else set())
     settings = config.get("settings", {})
     _keys(settings, allowed, "settings")
     _keys(overrides, allowed, "overrides")

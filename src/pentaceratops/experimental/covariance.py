@@ -132,6 +132,27 @@ class ModelAdapter:
         self.snapshot = None
         self.calls = dict(planet=0, binary=0, x2p=0)
 
+    # Optional free epoch (set by evidence.joint_fourier.sample_joint_scenario): Gaussian prior width in
+    # days, None = fixed. The offset is transit time minus the supplied epoch and moves every eclipse of
+    # the model together. Batched rows carry it as p["epoch_offset"]; the scalar reference reads
+    # scalar_epoch_offset. Window-support tests and the centred no-secondary constraint do not move.
+    epoch_sigma = None
+    scalar_epoch_offset = 0.
+
+    def shifted_time(self, grid):
+        """Model times of a grid in the frame of the shifted transit (the same array when unshifted)."""
+        if self.scalar_epoch_offset == 0.:
+            return self.model_time[grid]
+        # The transit-model caches are keyed by array identity; a temporary array must not alias one.
+        self.lk._tm_cache["id_time"] = None
+        self.lk._tm_sec_cache["id_time"] = None
+        return self.model_time[grid]-self.scalar_epoch_offset
+
+    def release_shifted_time(self):
+        if self.scalar_epoch_offset != 0.:
+            self.lk._tm_cache["id_time"] = None
+            self.lk._tm_sec_cache["id_time"] = None
+
     def _native_fold(self, data):
         """Where the model is evaluated and how it is folded, per model grid.
 
@@ -206,6 +227,8 @@ class ModelAdapter:
         for k, v in parameters.items():
             a = np.asarray(v)
             clean[k] = a.item() if a.size == 1 else a.tolist()
+        if self.epoch_sigma is not None:
+            clean["epoch_offset"] = float(self.scalar_epoch_offset)
         self.snapshot = dict(kind=kind, parameters=clean,
                              aperture_fraction=float(self.aperture_fraction),
                              photometric_loglike_ratio=float(gain), **extra)
@@ -220,7 +243,8 @@ class ModelAdapter:
                           u1=u1, u2=u2, ecc=ecc, argp=argp,
                           companion_fluxratio=companion_fluxratio, companion_is_host=companion_is_host,
                           exptime=exptime, nsamples=nsamples)
-        pri = self.aperture(self.fold_model("primary", self.lk.simulate_TP_transit(self.model_time["primary"], **parameters)))
+        pri = self.aperture(self.fold_model("primary", self.lk.simulate_TP_transit(self.shifted_time("primary"), **parameters)))
+        self.release_shifted_time()
         model = self.join_primary_secondary(pri, np.ones(len(self.times["secondary"])))
         gain = self.metric.gain(model)
         self.save_snapshot("planet", parameters, model, gain)
@@ -237,7 +261,9 @@ class ModelAdapter:
                           exptime=exptime, nsamples=nsamples)
         ts = self.times["secondary"]
         offset = float((self.lk.mean_anomaly_difference(ecc, np.deg2rad(argp)) - .5) * P_orb)
-        pri, sec = self.lk.simulate_EB_transit_secondary(self.model_time["primary"], self.model_time["secondary"], **parameters)
+        tp, tsec = self.shifted_time("primary"), self.shifted_time("secondary")
+        pri, sec = self.lk.simulate_EB_transit_secondary(tp, tsec, **parameters)
+        self.release_shifted_time()
         pri, sec = self.fold_model("primary", pri), self.fold_model("secondary", sec)
         outside = not ts.min() <= offset <= ts.max()
         phantom_gain = 0.
@@ -272,9 +298,10 @@ class ModelAdapter:
             allowed = bool(alternating_overlap(te, to, parameters, exptime)[0])
         if not allowed:
             return np.inf
-        me, mo = self.model_time["even"], self.model_time["odd"]
+        me, mo = self.shifted_time("even"), self.shifted_time("odd")
         e1, o2 = self.lk.simulate_EB_transit_evenodd(me, mo, **parameters)
         o1, e2 = self.lk.simulate_EB_transit_evenodd(mo, me, **parameters)
+        self.release_shifted_time()
         e1, e2 = self.fold_model("even", e1), self.fold_model("even", e2)
         o1, o2 = self.fold_model("odd", o1), self.fold_model("odd", o2)
         secondary = np.ones(len(self.times["secondary"]))

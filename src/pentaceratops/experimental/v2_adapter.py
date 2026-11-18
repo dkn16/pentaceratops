@@ -117,6 +117,7 @@ class OptimizedAdapter(ModelAdapter):
         nsamples = self.integration_samples(nsamples)
         n=len(p['P_orb']);out=np.full(n,-np.inf)
         offset=(self.lk.mean_anomaly_difference(p['ecc'],p['argp']*(np.pi/180.))-.5)*p['P_orb']
+        shift=np.asarray(p.get('epoch_offset',np.zeros(n)),float)  # transit time minus supplied epoch [d]
         if kind=='x2p':
             if self.timing_policy == 'legacy':
                 half=max(np.max(abs(self.times['even'])),np.max(abs(self.times['odd'])))
@@ -126,25 +127,25 @@ class OptimizedAdapter(ModelAdapter):
                 allowed=alternating_overlap(self.times['even'],self.times['odd'],p,self.data['exptime'])
             ids=np.flatnonzero(allowed)
             if not len(ids):return out
-            p={k:v[ids] for k,v in p.items()};offset=offset[ids]
+            p={k:v[ids] for k,v in p.items()};offset=offset[ids];shift=shift[ids]
             primary={};secondary={}
             for panel in ('even','odd'):
-                primary[panel]=self.dilute(self.undiluted(p,panel,-.5*offset,x2p=True,nsamples=nsamples),p)
-                secondary[panel]=self.dilute(self.undiluted(p,panel,.5*offset,secondary=True,x2p=True,nsamples=nsamples),p,secondary=True)
+                primary[panel]=self.dilute(self.undiluted(p,panel,-.5*offset+shift,x2p=True,nsamples=nsamples),p)
+                secondary[panel]=self.dilute(self.undiluted(p,panel,.5*offset+shift,secondary=True,x2p=True,nsamples=nsamples),p,secondary=True)
             flat=np.ones((len(ids),len(self.times['secondary'])))
             forward=np.concatenate([primary['even'],secondary['odd'],flat],axis=1)
             reverse=np.concatenate([secondary['even'],primary['odd'],flat],axis=1)
             a,b=self.score(forward),self.score(reverse)
             out[ids]=np.maximum(a,b) if self.parity=='profile' else np.logaddexp(a,b)-np.log(2)
         else:
-            primary=self.dilute(self.undiluted(p,'primary',np.zeros(n),planet=kind=='planet',nsamples=nsamples),p,planet=kind=='planet')
+            primary=self.dilute(self.undiluted(p,'primary',shift,planet=kind=='planet',nsamples=nsamples),p,planet=kind=='planet')
             sec=np.ones((n,len(self.times['secondary'])))
             phantom=np.zeros(n)
             if kind=='binary':
                 ts=self.times['secondary'];outside=(offset<ts.min())|(offset>ts.max())
                 # Preserve the existing centered-secondary non-detection
                 # constraint under both timing policies.
-                proposal=self.dilute(self.undiluted(p,'secondary',np.where(outside,0.,offset),secondary=True,nsamples=nsamples),p,secondary=True)
+                proposal=self.dilute(self.undiluted(p,'secondary',np.where(outside,0.,offset+shift),secondary=True,nsamples=nsamples),p,secondary=True)
                 sec[~outside]=proposal[~outside]
                 phantom[outside]=self.score(proposal[outside],metric='secondary')
             model=np.concatenate([primary[:,self.inverse_order],sec],axis=1)
@@ -159,7 +160,11 @@ class OptimizedAdapter(ModelAdapter):
         # Use the SAME integration count as the scalar evidence callback, even
         # when the caller overrides the adapter's default via scenario kwargs.
         nsamples = self.integration_samples(physics.nsamples)
+        offsets=None
+        if self.epoch_sigma is not None:  # free epoch: the trailing coordinate is the offset
+            theta=np.asarray(theta);offsets,theta=theta[:,-1],theta[:,:-1]
         start=time.perf_counter();out,ids,columns=physics.evaluate(theta)
+        if offsets is not None:columns=dict(columns,epoch_offset=np.ascontiguousarray(offsets[ids]))
         self.profile['physics_seconds']+=time.perf_counter()-start
         for lo in range(0,len(ids),self.chunk_size):
             part=slice(lo,lo+self.chunk_size)

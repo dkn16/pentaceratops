@@ -64,7 +64,8 @@ class PrimaryOnlyAdapter(OptimizedAdapter):
         parameters = dict(R_EB=R_EB,EB_fluxratio=EB_fluxratio,P_orb=P_orb,inc=inc,a=a,R_s=R_s,
                           u1=u1,u2=u2,ecc=ecc,argp=argp,companion_fluxratio=companion_fluxratio,
                           companion_is_host=companion_is_host,exptime=exptime,nsamples=nsamples)
-        primary, _ = self.lk.simulate_EB_transit(self.model_time['primary'], **parameters)
+        primary, _ = self.lk.simulate_EB_transit(self.shifted_time('primary'), **parameters)
+        self.release_shifted_time()
         # simulate_EB_transit also returns a depth probe. It is deliberately
         # unused: no observed secondary means no constraint on that depth.
         model = self.aperture(self.fold_model('primary', primary))[self.inverse_order]
@@ -77,7 +78,7 @@ class PrimaryOnlyAdapter(OptimizedAdapter):
             return super().photometric_columns(kind,p,nsamples=nsamples)
         nsamples = self.integration_samples(nsamples)
         n = len(p['P_orb'])
-        primary = self.dilute(self.undiluted(p,'primary',np.zeros(n),nsamples=nsamples),p)
+        primary = self.dilute(self.undiluted(p,'primary',np.asarray(p.get('epoch_offset',np.zeros(n)),float),nsamples=nsamples),p)
         value = self.score(primary[:,self.inverse_order])
         self.calls['binary'] += n
         self.profile['model_batches'] += 1
