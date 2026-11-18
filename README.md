@@ -9,6 +9,11 @@ persistent sampling.
 The same pages build into a website with `mkdocs serve`; see
 [developer workflow](docs/development.md#documentation-site).
 
+**Citation:** Diao, K., Robnik, J., Adolff, J., Karamanis, M., & Seljak, U., in
+preparation, *Statistically Validating Habitable Transiting Planets with
+pentaceratops: Improved Posterior Modeling and Implications*. See
+[citing](docs/index.md#citing) for a BibTeX entry.
+
 **Development version: `0.1.0.dev14`.** Run evidence directly from Python:
 
 ```python

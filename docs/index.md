@@ -21,8 +21,8 @@ It follows the scenario framework of
 
 !!! warning "Development version"
     The current version is `0.1.0.dev14`. Interfaces can still change, the
-    default sampling settings are provisional, and the accompanying paper is in
-    preparation. Check the [sampling notes](concepts/sampling.md) before
+    default sampling settings are provisional, and the [accompanying
+    paper](#citing) is in preparation. Check the [sampling notes](concepts/sampling.md) before
     relying on an individual FPP.
 
 ## A complete run in three calls
@@ -93,7 +93,25 @@ stellar table and population.
 
 ## Citing
 
-A paper describing the method is in preparation. Until it is available, please
-cite the repository and TRICERATOPS:
+If you use Pentaceratops, please cite the method paper, which is in preparation:
+
+- Diao, K., Robnik, J., Adolff, J., Karamanis, M., & Seljak, U., in preparation,
+  *Statistically Validating Habitable Transiting Planets with pentaceratops:
+  Improved Posterior Modeling and Implications*
+
+```bibtex
+@unpublished{pentaceratops,
+  author = {Diao, Kangning and Robnik, Jakob and Adolff, Julius and
+            Karamanis, Minas and Seljak, Uro{\v{s}}},
+  title  = {Statistically Validating Habitable Transiting Planets with
+            \texttt{pentaceratops}: Improved Posterior Modeling and Implications},
+  note   = {in preparation},
+  year   = {2026},
+  url    = {https://github.com/dkn16/pentaceratops}
+}
+```
+
+This entry will be replaced by the journal reference once the paper is out.
+The scenario framework comes from TRICERATOPS, which should be cited as well:
 
 - Giacalone, S., Dressing, C. D., Jensen, E. L. N., et al. 2021, AJ, 161, 24
