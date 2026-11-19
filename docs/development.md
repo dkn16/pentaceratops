@@ -112,6 +112,9 @@ paper's method figure converted from PDF with its white page background
 removed, so that the dark colour scheme can flip its lightness with a style
 rule in `docs/assets/extra.css`.
 
+The two input plots on the likelihoods page are made from real folded data by
+`tools/docs_likelihood_inputs.py`, in a light and a dark version each.
+
 The animation on the sampling page is made from a real fit by two scripts.
 `tools/docs_sampling_run.py` runs one planet scenario on folded data and records
 every sampler stage; `tools/docs_sampling_animation.py` renders that record to

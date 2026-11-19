@@ -33,6 +33,15 @@ default, capped below a quarter of the period so they cannot overlap. The noise
 covariance combines the measurement errors with the uncertainty of the
 subtracted trend, including its correlation between the three windows.
 
+![The even, odd and secondary windows of TOI-6612.01 after the variability is removed: a 1 per cent transit in the even and odd windows and a flat secondary window](../assets/likelihood_input_subtracted_light.svg#only-light)
+![The even, odd and secondary windows of TOI-6612.01 after the variability is removed: a 1 per cent transit in the even and odd windows and a flat secondary window](../assets/likelihood_input_subtracted_dark.svg#only-dark)
+
+*What the subtracted likelihood is given, for TOI-6612.01 (a 1 per cent
+transit every 2.32 days). Each window holds 29 half-hour bins spanning 7 hours
+either side of its centre. The error bars are the measurement errors, 200 to
+300 ppm; the uncertainty of the subtracted trend is carried separately in the
+covariance.*
+
 Keeping even and odd transits apart is what lets the period-doubled binary
 scenarios be tested: a difference between the two folds favours a binary at
 twice the period, and agreement constrains it. The secondary window does the
@@ -52,6 +61,16 @@ preprocessing, and the likelihood integrates over it. The data are all observed
 samples, folded at twice the candidate period so that alternating eclipses stay
 distinct. Gaps stay gaps: the covariance is propagated through the actual
 observation mask and folding, and nothing is interpolated.
+
+![Top: all 224 bins of TOI-6612.01 folded at twice the period, showing the even and odd transits and slow stellar variability. Bottom: the correlation of the noise between two bins against their separation, falling from 1 to zero over about ten hours](../assets/likelihood_input_marginalized_light.svg#only-light)
+![Top: all 224 bins of TOI-6612.01 folded at twice the period, showing the even and odd transits and slow stellar variability. Bottom: the correlation of the noise between two bins against their separation, falling from 1 to zero over about ten hours](../assets/likelihood_input_marginalized_dark.svg#only-dark)
+
+*What the marginalized likelihood is given, for the same candidate. Top: all
+224 half-hour bins of the fold at twice the period. The stellar variability is
+still in the data, as the slow drift between the transits, and the error bars,
+about 600 ppm, include it. Bottom: the noise model treats that variability as
+correlated noise. Neighbouring bins are correlated at 0.68, and the correlation
+dies away over about ten hours.*
 
 Because the whole orbit is fitted, there is no window to choose and a secondary
 eclipse can lie at any phase. The price is a dense covariance matrix, which
