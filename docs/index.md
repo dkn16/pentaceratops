@@ -9,9 +9,12 @@ It follows the scenario framework of
 [TRICERATOPS](https://github.com/stevengiacalone/triceratops)
 (Giacalone et al. 2021) and changes three parts of the calculation:
 
-- **More of the light curve is used.** Eclipsing-binary scenarios are tested
-  against the secondary eclipse and against the difference between even and odd
-  transits, not only the primary transit.
+- **The likelihood uses more of the light curve, and the priors are more
+  informative.** Eclipsing-binary scenarios are tested against the secondary
+  eclipse and against the difference between even and odd transits, not only the
+  primary transit. The priors can include a companion population conditioned on
+  the target's Gaia astrometry, and demographic odds between planets and
+  eclipsing binaries.
 - **Stellar variability can be marginalized.** In addition to the usual
   likelihood on a detrended light curve, a second likelihood integrates over a
   Gaussian model of the variability described by its power spectrum.
