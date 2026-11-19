@@ -127,7 +127,7 @@ enabled in the repository settings as described at the top of that file.
 - Current tests use Python 3.13; the PyTransit upgrade is tested in a separate
   scratch virtual environment, leaving `exoprob` unchanged. Other advertised
   Python versions still need a CI matrix.
-- PyTransit is constrained to `>=2.9.2,<2.10`, and MeepMeep to `>=1.1,<1.2`.
+- PyTransit is constrained to `>=2.9.2,<2.11`, and MeepMeep to `>=1.1,<1.3`.
   Its quadratic kernel's orbit implementation is also used by our fast path;
   do not relax these bounds without the compatibility tests. See
   [PyTransit upgrade](pytransit.md). There is no runtime setuptools constraint.

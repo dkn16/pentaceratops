@@ -1,8 +1,10 @@
 # PyTransit 2.9 upgrade
 
-The standalone package now targets `pytransit>=2.9.2,<2.10` and
-`meepmeep>=1.1.0,<1.2`. These are bounded because the experimental fast
-backend uses internal routines that must match the scalar model. This is a
+The standalone package now targets `pytransit>=2.9.2,<2.11` and
+`meepmeep>=1.1.0,<1.3`. These are bounded because the experimental fast
+backend uses internal routines that must match the scalar model. PyTransit
+2.10.1 with MeepMeep 1.2.1 was checked on 2026-11-18; see
+[PyTransit 2.10](#pytransit-210). This is a
 development upgrade, not a rerun or replacement of published results.
 
 Upstream: [PyTransit 2.9.2](https://pypi.org/project/PyTransit/2.9.2/),
@@ -81,3 +83,35 @@ environment when reproducing old results; there is no guarantee of bitwise
 equality across the dependency upgrade. Batching remains opt-in.
 
 See [validation](validation.md) for the complete suite and wheel checks.
+
+## PyTransit 2.10
+
+PyTransit 2.10.1 and MeepMeep 1.2.1 were tested on 2026-11-18 and the upper
+bounds were raised to admit them. The four internal routines the fast path
+imports (`eval_quad_z_s`, `solve2d`, `sep_c`, `bounding_box`) are still present;
+`solve2d` gained an optional trailing argument that the package does not use.
+
+- **Tests:** all 469 tests pass with PyTransit 2.10.1, MeepMeep 1.2.1 and
+  Numba 0.68.1, including every scalar-against-fast comparison.
+- **Model outputs:** the 240-fixture comparison of
+  `tools/check_pytransit_upgrade.py` between 2.9.2 and 2.10.1 changes no model
+  by more than `2e-9` ppm, and the two evidence checks by `9e-16` and `0`.
+- **Real targets:** the complete `evidence()` call was run for TOI-6612.01 and
+  TOI-700.02 with both likelihoods, default sampling and seed 42, on one core
+  each of one node, twice per environment.
+
+| Environment | PyTransit | MeepMeep | Numba | Total time, relative |
+| --- | --- | --- | --- | ---: |
+| Matched, old | 2.9.2 | 1.1.0 | 0.63.1 | 1.000 |
+| Matched, new | 2.10.1 | 1.2.1 | 0.63.1 | 0.999 |
+| Newest Numba | 2.10.1 | 1.2.1 | 0.68.1 | 1.020 |
+
+The matched pair differs only in PyTransit and MeepMeep. Its log Bayes factors
+are identical in every scenario, and its run times agree to 0.1 per cent,
+within the 1 to 3 per cent scatter between repeated passes. With Numba 0.68.1
+the log Bayes factors differ by at most `6e-7` and the run is about 2 per cent
+slower; that difference comes from Numba. MeepMeep 1.1.0 cannot be installed
+together with Numba 0.68.1, so PyTransit 2.9.2 was not tested with it.
+
+This is one machine and two targets, not a dependency matrix. Other
+combinations still need their own check.

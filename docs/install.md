@@ -47,8 +47,8 @@ This prints the default sampling effort for each scenario. See
 | Package | Range | Reason |
 | --- | --- | --- |
 | NumPy | `>=2.0,<2.3` | Inherited code still relies on scalar conversions that newer NumPy deprecates |
-| PyTransit | `>=2.9.2,<2.10` | The fast model path uses PyTransit internals that must match the reference model |
-| MeepMeep | `>=1.1.0,<1.2` | Orbit routines shared with PyTransit |
+| PyTransit | `>=2.9.2,<2.11` | The fast model path uses PyTransit internals that must match the reference model; 2.9.2 and 2.10.1 are tested |
+| MeepMeep | `>=1.1.0,<1.3` | Orbit routines shared with PyTransit; 1.1.0 and 1.2.1 are tested |
 
 ## Storage and runtime settings
 
