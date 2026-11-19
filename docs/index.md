@@ -5,6 +5,11 @@ planet candidate. It takes the candidate's light curve and the stars in and
 around the photometric aperture, fits eighteen competing astrophysical
 scenarios, and reports how probable each one is.
 
+[![Method overview. Top: the pipeline from the folded photometry, ephemeris and stellar scene, through the scenario bank, the prior and likelihood and the persistent sampler, to scenario scores, demographic weights and the validation outputs. Bottom: a folded candidate, the scenario families, the eclipse windows, the marginalized likelihood, persistent sampling, and radius posteriors.](assets/method_overview.svg){ .overview-figure }](assets/method_overview.svg)
+
+*How a candidate becomes an FPP: the pipeline (top) and what each stage works
+with (bottom). Click the figure to enlarge it.*
+
 It follows the scenario framework of
 [TRICERATOPS](https://github.com/stevengiacalone/triceratops)
 (Giacalone et al. 2021) and changes three parts of the calculation:

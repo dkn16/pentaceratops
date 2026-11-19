@@ -9,3 +9,15 @@ video.explainer {
 video.explainer.only-dark { display: none; }
 [data-md-color-scheme="slate"] video.explainer.only-light { display: none; }
 [data-md-color-scheme="slate"] video.explainer.only-dark { display: block; }
+
+/* The overview figure is drawn for a light page. On the dark scheme, flip its lightness and keep the
+   hues; its background is transparent, so the page colour shows through. */
+img.overview-figure {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0.6em 0 0.2em;
+}
+[data-md-color-scheme="slate"] img.overview-figure {
+  filter: invert(0.92) hue-rotate(180deg);
+}

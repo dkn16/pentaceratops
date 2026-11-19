@@ -107,6 +107,11 @@ ignores.
   `exclude_docs` in `mkdocs.yml` and are not published; add any new file of that
   kind there.
 
+The overview figure on the home page, `docs/assets/method_overview.svg`, is the
+paper's method figure converted from PDF with its white page background
+removed, so that the dark colour scheme can flip its lightness with a style
+rule in `docs/assets/extra.css`.
+
 The animation on the sampling page is made from a real fit by two scripts.
 `tools/docs_sampling_run.py` runs one planet scenario on folded data and records
 every sampler stage; `tools/docs_sampling_animation.py` renders that record to
