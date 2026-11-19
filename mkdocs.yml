@@ -49,6 +49,9 @@ theme:
     - content.code.copy
     - content.action.edit
 
+extra_css:
+  - assets/extra.css
+
 plugins:
   - search
   - mkdocstrings:

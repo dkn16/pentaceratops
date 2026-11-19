@@ -15,6 +15,50 @@ reweighted, so their likelihood evaluations are reused.
 The run ends when the full likelihood is reached. It returns the evidence
 estimate and the weighted pool, which is a sample from the posterior.
 
+### Watch one run
+
+The animation below replays an actual fit: the planet-on-target scenario for
+TOI-700.02 with the subtracted likelihood. Press play.
+
+<video class="explainer only-light" controls loop muted playsinline preload="metadata"
+       aria-label="Animation of persistent sampling on a real transit: particles concentrate from the prior onto the posterior over twelve stages">
+  <source src="../../assets/persistent_sampling_light.webm" type="video/webm">
+  <source src="../assets/persistent_sampling_light.webm" type="video/webm">
+  Your browser cannot play this video; open the final frame below.
+</video>
+
+<video class="explainer only-dark" controls loop muted playsinline preload="metadata"
+       aria-label="Animation of persistent sampling on a real transit: particles concentrate from the prior onto the posterior over twelve stages">
+  <source src="../../assets/persistent_sampling_dark.webm" type="video/webm">
+  <source src="../assets/persistent_sampling_dark.webm" type="video/webm">
+  Your browser cannot play this video; open the final frame below.
+</video>
+
+On the left, each dot is one particle, placed by its planet radius and impact
+parameter; the area of a dot is its current weight. On the right are the folded
+transit data with light curves drawn from the weighted pool. Three things to
+watch:
+
+- **β** is the weight given to the likelihood. It rises from 0 (the prior) to 1
+  (the posterior) in steps the sampler chooses itself, small at first and
+  larger later.
+- **Raising β reweights every particle kept so far.** Particles whose models
+  miss the data shrink away; those that fit grow. The light curves on the right
+  tighten around the data at the same time.
+- **Each stage then adds new particles** (orange) by resampling from the
+  weighted pool and moving them with a Metropolis sampler. Earlier particles
+  stay in the pool, which is what "persistent" refers to.
+
+At β = 1 the weighted pool is the posterior, here a planet of about 1.2 Earth
+radii, and the normalization of the weights is the evidence.
+
+This run used `N=400` and `steps=20`, more particles than the default, so that
+the picture is dense; it took twelve stages and kept 4,800 particles.
+
+??? note "Final frame as an image"
+    ![Final frame: the weighted pool concentrated at about 1.2 Earth radii, and model light curves matching the transit](../assets/persistent_sampling_light.png#only-light)
+    ![Final frame: the weighted pool concentrated at about 1.2 Earth radii, and model light curves matching the transit](../assets/persistent_sampling_dark.png#only-dark)
+
 Two settings control the effort:
 
 | Setting | Meaning | More of it |

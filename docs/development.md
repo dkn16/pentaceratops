@@ -107,6 +107,12 @@ ignores.
   `exclude_docs` in `mkdocs.yml` and are not published; add any new file of that
   kind there.
 
+The animation on the sampling page is made from a real fit by two scripts.
+`tools/docs_sampling_run.py` runs one planet scenario on folded data and records
+every sampler stage; `tools/docs_sampling_animation.py` renders that record to
+WebM (VP9, needs `ffmpeg`) in a light or dark theme. The four files it produces
+live in `docs/assets/`.
+
 `.github/workflows/docs.yml` builds the site on every change that touches it.
 Publishing to GitHub Pages happens from `main` only, and only after it has been
 enabled in the repository settings as described at the top of that file.

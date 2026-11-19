@@ -20,7 +20,7 @@ It follows the scenario framework of
   Gaussian model of the variability described by its power spectrum.
 - **Evidence comes from persistent sampling.** Each scenario's Bayesian evidence
   is estimated with a tempered particle sampler, which also returns posterior
-  samples of the physical parameters.
+  samples of the physical parameters. [Watch one run](concepts/sampling.md#watch-one-run).
 
 !!! warning "Development version"
     The current version is `0.1.0.dev14`. Interfaces can still change, the

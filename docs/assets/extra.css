@@ -1,0 +1,11 @@
+/* Explainer videos come in a light and a dark version; show the one matching the colour scheme. */
+video.explainer {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 1em 0 0.4em;
+}
+video.explainer.only-dark { display: none; }
+[data-md-color-scheme="slate"] video.explainer.only-light { display: none; }
+[data-md-color-scheme="slate"] video.explainer.only-dark { display: block; }
