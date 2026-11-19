@@ -9,7 +9,7 @@ from pentaceratops.evidence import evidence
 
 prepared = RunResult.load("/path/to/cache/prepared/<candidate>_<hash>.npz")
 target = load_target("/path/to/new_field")
-results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="marginalized", eb_eta=0.1)
 ```
 
 `prepare_target` creates a new TESS field; `load_target` reloads its saved
@@ -45,9 +45,9 @@ For a saved output from `examples/tess_candidate.py` or `kepler_candidate.py`:
   "stars": "stars.csv",
   "trilegal": "trilegal.csv",
   "input": {"format": "candidate", "path": "prepared/candidate.npz"},
-  "likelihood": "real",
+  "likelihood": "subtracted",
   "settings": {"N": 500, "steps": 50, "seed": 42, "eb_eta": 0.1},
-  "output": "results/real.npz"
+  "output": "results/subtracted.npz"
 }
 ```
 
@@ -55,10 +55,10 @@ For a saved output from `examples/tess_candidate.py` or `kepler_candidate.py`:
 target ID must match the saved ephemeris (TIC for TESS, KIC for Kepler).
 No candidate identifier is guessed from a filename.
 
-The same candidate preparation can also supply folded full-orbit Fourier:
+The same candidate preparation can also be run with the marginalized likelihood:
 
 ```bash
-pentaceratops evidence target.json --likelihood fourier --output results/fourier.npz
+pentaceratops evidence target.json --likelihood marginalized --output results/marginalized.npz
 ```
 
 An explicit `--output` is relative to the working directory. Outputs must be
@@ -100,26 +100,26 @@ substitutions, never target substitutions.
 For `candidate` inputs, the command finishes covariance preparation using the
 state saved by the example scripts:
 
-- **Real:** reconstruct the fixed-PSD conditional coefficient posterior from
+- **Subtracted:** reconstruct the fixed-PSD conditional coefficient posterior from
   the saved final fit input and training mask; apply the original weighted
   folding operator to its mean and covariance. Preserve covariance between
   the even, odd and secondary panels. Retain the HZ convention of one median
   measurement error per panel, separately from the trend covariance.
-- **Fourier:** use every saved raw observed sample, normalized by its saved
+- **Marginalized:** use every saved raw observed sample, normalized by its saved
   sector baseline. Fold at 2P, retaining alternating eclipses and absent bins,
   and propagate each sector's saved PSD through the same folding operator.
   The PSD white floor enters once; the finite DC prior uses the lowest-frequency
   total power. No native dense covariance or inverse is needed.
 
 Both use the existing optimized HZ evidence routines. Normalization, masks,
-ephemerides and the Real folding operator are checked against the preparation.
+ephemerides and the folding operator of the subtracted likelihood are checked against the preparation.
 These are new inferences using those supplied data and PSDs; they do not update
 or automatically reproduce previously saved paper results.
 
 Covariance preparation and evidence can be expensive. Run real candidates in
 a compute allocation. The command processes scenarios sequentially; use
 separate processes for different targets and one numerical-library thread per
-worker. The Fourier folded covariance is dense, even though its construction uses
+worker. The folded covariance of the marginalized likelihood is dense, even though its construction uses
 FFT products without a native covariance matrix.
 
 ## Existing likelihood-ready HZ inputs
@@ -131,7 +131,7 @@ To skip covariance preparation, change only the input description:
 ```
 
 This uses `load_folded_real`. Explicit primary-only preparations also require
-`"primary_only": true` in `settings`. To reproduce the saved Real timing rule,
+`"primary_only": true` in `settings`. To reproduce the saved timing rule of the subtracted likelihood,
 set `"timing_policy": "legacy"` there. The ordinary-EB secondary penalty is
 preserved under both settings.
 
@@ -141,7 +141,7 @@ For a directory saved by `FoldedFourierData.save`:
 "input": {"format": "folded_fourier", "directory": "folded_fourier"}
 ```
 
-Set `"likelihood": "fourier"` as well. This interface uses the full-orbit
+Set `"likelihood": "marginalized"` as well. This interface uses the full-orbit
 folding operator. Original half-grid Fourier archive recipes remain available
 through `run_folded_baseline` or `calc_probs_fourier(..., timing_policy="legacy", weighting="legacy")`;
 the command does not reinterpret those archives as full-orbit inputs.
@@ -154,12 +154,12 @@ CLI overrides include `--N`, `--steps`, `--nsamples`, `--seed`,
 An explicit integer overrides that field for every scenario independently;
 `"N": 500, "steps": 50` reproduces the previous uniform effort settings.
 Other defaults are seed 42, 2000 posterior draws, profile parity and eta=1;
-exposure integration uses 20 subsamples for Real or 7 for Fourier.
+exposure integration uses 20 subsamples for the subtracted likelihood or 7 for the marginalized one.
 The example explicitly chooses the paper's eta=0.1.
 Particle counts are effort settings, not evidence-convergence guarantees.
 
 The JSON also accepts `scenarios`, `parity`, `filt`, `missing_host_policy`, and,
-for Real, `primary_only`, `include_gp` and `timing_policy`. Both likelihoods accept
+for the subtracted likelihood, `primary_only`, `include_gp` and `timing_policy`. Both likelihoods accept
 `free_epoch` (default `false`) and `epoch_sigma` in days (default 3 minutes), the
 Gaussian prior width of a sampled transit-time offset; see the
 [evidence API](evidence_api.md#arguments). Unknown or incompatible

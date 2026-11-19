@@ -21,12 +21,12 @@ pentaceratops [--version] {doctor,sampling-policy,inspect,evidence} ...
 
 ```bash
 pentaceratops evidence target.json
-pentaceratops evidence target.json --likelihood fourier --output results/fourier.npz
+pentaceratops evidence target.json --likelihood marginalized --output results/marginalized.npz
 ```
 
 | Flag | Meaning |
 | --- | --- |
-| `--likelihood {real,fourier}` | Override the likelihood named in the configuration. |
+| `--likelihood {subtracted,marginalized}` | Override the likelihood named in the configuration. |
 | `--output PATH` | New result file, relative to the current directory. |
 | `--N`, `--steps` | Sampling effort for every scenario. |
 | `--nsamples` | Exposure-integration points. |

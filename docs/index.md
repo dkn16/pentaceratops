@@ -47,7 +47,7 @@ prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/ca
 target = prepare_target(prepared, output_dir="/path/to/new_field")
 
 # 3. Fit every scenario and combine them into an FPP.
-results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="marginalized", eb_eta=0.1)
 
 print(results.output[["ID", "scenario", "lnBF", "prob"]])
 print("FPP:", results.output.attrs["FPP"])

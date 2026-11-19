@@ -18,7 +18,7 @@ from pentaceratops.evidence import evidence
 
 prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
 target = prepare_target(prepared, output_dir="/path/to/new_field")
-results = evidence(prepared, target=target, likelihood="fourier", N=500, steps=50, eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="marginalized", N=500, steps=50, eb_eta=0.1)
 ```
 
 `prepare_target` creates a new TESS field; `load_target` reloads its saved
@@ -29,7 +29,7 @@ The function returns the preparation object and the path where it was saved.
 If you ran one of the scripts below instead, copy its `Prepared data: ...`
 path and load it with `RunResult.load`, as shown in [Storage and replay](#storage-and-replay).
 You can also pass that path directly to `evidence`. Set
-`likelihood="real"` for Real evidence. See the [Python interface](../evidence_api.md)
+`likelihood="subtracted"` for the subtracted likelihood. See the [Python interface](../evidence_api.md)
 for arguments and results. The optional command-line entry point remains
 `pentaceratops evidence target.json`, with [evidence.json](https://github.com/dkn16/pentaceratops/blob/main/examples/evidence.json) as a
 configuration template.

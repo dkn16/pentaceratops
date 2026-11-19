@@ -10,7 +10,7 @@ from pentaceratops.evidence import evidence
 
 prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
 target = prepare_target(prepared, output_dir="/path/to/new_field")
-results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="marginalized", eb_eta=0.1)
 ```
 
 `prepared` holds photometry and its saved noise model. `target` holds the host
@@ -86,12 +86,12 @@ from pentaceratops.evidence import evidence
 
 prepared = RunResult.load("/path/to/cache/prepared/<candidate>_<hash>.npz")
 target = load_target("/path/to/new_field")
-results = evidence(prepared, target=target, likelihood="real", eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="subtracted", eb_eta=0.1)
 ```
 
 `load_target` verifies the manifest and file hashes. It does not query catalogs,
-read the original FITS, or rerun dilution. The same field can be used for Real
-and Fourier evidence for the same candidate. Save a separate field for each
+read the original FITS, or rerun dilution. The same field can be used for the subtracted
+and the marginalized likelihood of the same candidate. Save a separate field for each
 candidate: eligibility depends on the candidate's transit depth.
 
 ## Optional supplied inputs

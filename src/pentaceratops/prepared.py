@@ -19,6 +19,22 @@ COMMON_DEFAULTS = dict(N=None, steps=None, seed=42, posterior_samples=2000,
                        free_epoch=False, epoch_sigma=None)
 COMMON_OPTIONS = set(COMMON_DEFAULTS) | {"nsamples", "scenarios", "filt"}
 REAL_OPTIONS = {"primary_only", "include_gp", "timing_policy"}
+# Public likelihood names follow the paper. "real" and "fourier" are the earlier names of the same two
+# likelihoods; they remain accepted and are the internal labels used below.
+LIKELIHOOD_NAMES = {"subtracted": "real", "marginalized": "fourier", "real": "real", "fourier": "fourier"}
+PAPER_NAMES = {"real": "subtracted", "fourier": "marginalized"}
+
+
+def likelihood_domain(name):
+    """Return the internal label, "real" or "fourier", of a likelihood name.
+
+    "subtracted" (stellar variability estimated and subtracted) and "marginalized"
+    (variability integrated over with its power spectrum) are the public names;
+    the earlier names "real" and "fourier" are accepted as aliases.
+    """
+    if isinstance(name, str) and name in LIKELIHOOD_NAMES:
+        return LIKELIHOOD_NAMES[name]
+    raise ValueError('likelihood must be "subtracted" or "marginalized"')
 
 
 def _keys(mapping, allowed, label):
@@ -85,8 +101,7 @@ def _stellar_parameters(target, missing_host_policy):
 
 
 def _options(domain, settings):
-    if domain not in ("real", "fourier"):
-        raise ValueError("likelihood must be real or fourier")
+    domain = likelihood_domain(domain)
     allowed = COMMON_OPTIONS | (REAL_OPTIONS if domain == "real" else set())
     _keys(settings, allowed, "settings")
     options = dict(COMMON_DEFAULTS, nsamples=20 if domain == "real" else 7)
@@ -123,7 +138,7 @@ def _options(domain, settings):
     return options
 
 
-def evidence(prepared, *, target, likelihood="real", N=None, steps=None, nsamples=None,
+def evidence(prepared, *, target, likelihood="subtracted", N=None, steps=None, nsamples=None,
              seed=42, posterior_samples=2000, parity="profile", eb_eta=1.,
              trilegal_fname=None, molusc_file=None, filt=None, scenarios=None,
              missing_host_policy="error", primary_only=None, include_gp=None,
@@ -136,6 +151,10 @@ def evidence(prepared, *, target, likelihood="real", N=None, steps=None, nsample
     ``target`` supplies .mission, .stars and optionally .trilegal_fname; the
     first stellar row must be the target. No JSON or CSV export is required.
 
+    likelihood is "subtracted" (stellar variability estimated and subtracted; the
+    default) or "marginalized" (variability integrated over using its power
+    spectrum). The earlier names "real" and "fourier" are accepted as aliases.
+
     A candidate bundle's fixed saved PSD is propagated without refitting it.
     Existing likelihood-ready objects are used directly. No files are written
     unless output_path is supplied; the returned RunResult can be saved later.
@@ -145,9 +164,10 @@ def evidence(prepared, *, target, likelihood="real", N=None, steps=None, nsample
     N/steps default to the shared per-scenario sampling policy. An explicit
     integer overrides only that field for every scenario; None uses the policy.
     Resolved settings and the policy version are saved in output.attrs.
-    Exposure subsamples default to 20 for Real or 7 for Fourier. Real-only
-    primary_only/include_gp/timing_policy default to False/True/observed;
-    supplying these for Fourier is an error. Use eb_eta=0.1 for the paper odds.
+    Exposure subsamples default to 20 for subtracted or 7 for marginalized.
+    primary_only/include_gp/timing_policy apply to the subtracted likelihood only
+    and default to False/True/observed; supplying them for the marginalized
+    likelihood is an error. Use eb_eta=0.1 for the paper odds.
 
     free_epoch=True (default False) samples a transit-time offset from the
     supplied epoch in every scenario, with a zero-mean Gaussian prior of width
@@ -161,7 +181,8 @@ def evidence(prepared, *, target, likelihood="real", N=None, steps=None, nsample
                        ("epoch_sigma", epoch_sigma)):
         if value is not None:
             settings[key] = value
-    options = _options(likelihood, settings)
+    domain = likelihood_domain(likelihood)
+    options = _options(domain, settings)
     destination = None if output_path is None else _path(output_path, Path.cwd())
     if destination is not None:
         RunResult.check_destination(destination)
@@ -186,8 +207,8 @@ def evidence(prepared, *, target, likelihood="real", N=None, steps=None, nsample
     path = _path(prepared, Path.cwd()) if isinstance(prepared, (str, Path)) else None
     if path is not None:
         if path.is_dir():
-            if likelihood != "fourier":
-                raise ValueError("A saved FoldedFourierData directory requires likelihood='fourier'")
+            if domain != "fourier":
+                raise ValueError('A saved FoldedFourierData directory requires likelihood="marginalized"')
             files += [path/"fold.json", path/"fold_map.npz", path/"block/block.json"]
             files += [path/"block"/(key+".npy")
                       for key in ("time", "flux", "precision", "projected_residual", "sigma")]
@@ -207,20 +228,20 @@ def evidence(prepared, *, target, likelihood="real", N=None, steps=None, nsample
         if candidate.get("mission") != mission or candidate.get("host_id") != target_id:
             raise ValueError("Prepared candidate and target/mission do not match")
         from .preprocessing.evidence_inputs import candidate_folded_real, candidate_folded_fourier
-        prepare = candidate_folded_real if likelihood == "real" else candidate_folded_fourier
+        prepare = candidate_folded_real if domain == "real" else candidate_folded_fourier
         preparation_metadata = snapshot(prepared.metadata)
         data, kind = prepare(prepared), "candidate"
-    elif isinstance(prepared, FoldedFourierData) and likelihood == "fourier":
+    elif isinstance(prepared, FoldedFourierData) and domain == "fourier":
         data, kind = prepared, "folded_fourier"
-    elif isinstance(prepared, dict) and likelihood == "real":
+    elif isinstance(prepared, dict) and domain == "real":
         data, kind = prepared, "folded_real"
     else:
         raise TypeError("prepared must be a candidate RunResult/NPZ, a folded Real dictionary, "
                         "or FoldedFourierData/directory matching the likelihood")
-    calculate = hz.calc_probs_folded_real if likelihood == "real" else hz.calc_probs_folded_fourier
+    calculate = hz.calc_probs_folded_real if domain == "real" else hz.calc_probs_folded_fourier
     result = calculate(host, data, trilegal_fname=str(population),
                        molusc_file=None if molusc is None else str(molusc), **options)
-    result.metadata["evidence_call"] = dict(input_format=kind, likelihood=likelihood,
+    result.metadata["evidence_call"] = dict(input_format=kind, likelihood=PAPER_NAMES[domain],
         resolved_settings=options, files=provenance, preparation_metadata=preparation_metadata,
         output_path=None if destination is None else str(destination))
     if destination is not None:
@@ -248,9 +269,7 @@ def run_prepared(config_path, *, likelihood=None, output_path=None, **overrides)
     mission = config["mission"]
     if mission not in ("TESS", "Kepler", "K2"):
         raise ValueError("mission must be TESS, Kepler, or K2")
-    domain = config.get("likelihood", "real") if likelihood is None else likelihood
-    if domain not in ("real", "fourier"):
-        raise ValueError("likelihood must be real or fourier")
+    domain = likelihood_domain(config.get("likelihood", "subtracted") if likelihood is None else likelihood)
     allowed = COMMON_OPTIONS | (REAL_OPTIONS if domain == "real" else set())
     settings = config.get("settings", {})
     _keys(settings, allowed, "settings")
@@ -305,7 +324,7 @@ def run_prepared(config_path, *, likelihood=None, output_path=None, **overrides)
         data = FoldedFourierData.load(paths["directory"])
     result = evidence(data, target=target, likelihood=domain, trilegal_fname=str(population),
                        molusc_file=None if molusc is None else str(molusc), **options)
-    result.metadata["prepared_run"] = dict(schema_version=1, likelihood=domain, input_format=kind,
+    result.metadata["prepared_run"] = dict(schema_version=1, likelihood=PAPER_NAMES[domain], input_format=kind,
         configuration=config, resolved_settings=options, files=provenance, output_path=str(destination),
         preparation="fixed saved PSD; no detrending refit" if kind == "candidate" else "loaded prepared likelihood inputs")
     result.save(destination)

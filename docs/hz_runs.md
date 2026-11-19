@@ -9,7 +9,7 @@ from pentaceratops.evidence import evidence
 
 prepared = RunResult.load("/path/to/cache/prepared/<candidate>_<hash>.npz")
 target = load_target("/path/to/new_field")
-results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="marginalized", eb_eta=0.1)
 ```
 
 `prepare_target` creates a new TESS field; `load_target` reloads its saved

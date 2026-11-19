@@ -13,7 +13,7 @@ block of the [command-line configuration](../evidence_command.md).
 
 | Option | Default | Meaning | More |
 | --- | --- | --- | --- |
-| `likelihood` | `"real"` | `"real"`: subtracted likelihood. `"fourier"`: marginalized likelihood. | [Likelihoods](../concepts/likelihoods.md) |
+| `likelihood` | `"subtracted"` | `"subtracted"` or `"marginalized"`. The earlier names `"real"` and `"fourier"` are accepted as aliases. | [Likelihoods](../concepts/likelihoods.md) |
 | `eb_eta` | `1.0` | Weight multiplying every eclipsing-binary scenario. `0.1` is the value used for real candidates in the paper. | [Scenarios](../concepts/scenarios.md#demographic-odds-eb_eta) |
 | `scenarios` | all | List of scenario labels to fit. A subset gives a conditional FPP. | [Scenarios](../concepts/scenarios.md#fitting-a-subset-of-scenarios) |
 | `free_epoch` | `False` | Sample a transit-time offset from the supplied epoch. | [Transit-time offset](../concepts/likelihoods.md#transit-time-offset) |
@@ -29,7 +29,7 @@ block of the [command-line configuration](../evidence_command.md).
 | `steps` | per scenario | Metropolis sweeps per stage. | |
 | `seed` | `42` | Random seed of the call; a non-negative 32-bit integer. | [Seeds](../concepts/sampling.md#seeds-and-reproducibility) |
 | `posterior_samples` | `2000` | Equal-weight posterior draws kept per scenario. | |
-| `nsamples` | 20 (`real`), 7 (`fourier`) | Points used to average a model over one exposure. | [Exposure integration](../exposure.md) |
+| `nsamples` | 20 (subtracted), 7 (marginalized) | Points used to average a model over one exposure. | [Exposure integration](../exposure.md) |
 
 ### Inputs
 
@@ -43,7 +43,7 @@ block of the [command-line configuration](../evidence_command.md).
 
 ### Subtracted likelihood only
 
-Passing any of these with `likelihood="fourier"` is an error.
+Passing any of these with `likelihood="marginalized"` is an error.
 
 | Option | Default | Meaning |
 | --- | --- | --- |

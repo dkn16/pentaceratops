@@ -120,7 +120,7 @@ def test_one_command_runs_sampler_and_matches_python_api(monkeypatch, tmp_path, 
     calculate = calc_probs_folded_real if domain == "real" else calc_probs_folded_fourier
     reference = calculate(target(), prepare(saved), trilegal_fname=str(tmp_path/"population.csv"), **options)
     np.testing.assert_array_equal(result.output.lnBF, reference.output.lnBF)
-    assert result.metadata["prepared_run"]["likelihood"] == domain
+    assert result.metadata["prepared_run"]["likelihood"] == {"real": "subtracted", "fourier": "marginalized"}[domain]
     assert all(len(r["sha256"]) == 64 for r in result.metadata["prepared_run"]["files"])
     assert '"FPP"' in capsys.readouterr().out
     monkeypatch.setattr("pentaceratops.prepared.hz.calc_probs_folded_real", lambda *a, **k: pytest.fail("No overwrite"))

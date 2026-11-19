@@ -1,7 +1,7 @@
 # Pentaceratops
 
 Statistical validation of transiting planet candidates using competing planet
-and eclipsing-binary scenarios, real-space or Fourier-space likelihoods, and
+and eclipsing-binary scenarios, subtracted or marginalized likelihoods, and
 persistent sampling.
 
 **Documentation:** start with the [overview](docs/index.md), the
@@ -23,7 +23,7 @@ from pentaceratops.evidence import evidence
 
 prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
 target = prepare_target(prepared, output_dir="/path/to/new_field")
-results = evidence(prepared, target=target, likelihood="fourier", N=500, steps=50, eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="marginalized", N=500, steps=50, eb_eta=0.1)
 ```
 
 `prepare_candidate` downloads and preprocesses the light curve as needed,
@@ -108,7 +108,7 @@ and target sweeps should use a compute job; an example Slurm script is provided.
 Each script prints `Prepared data: /.../prepared/<candidate>_<hash>.npz`.
 Load that file as `prepared` or pass its path to `evidence`, along with your
 prepared stellar-field object. The evidence function propagates the saved FGP
-state into the appropriate Real or Fourier covariance. The scripts themselves
+state into the covariance of the chosen likelihood. The scripts themselves
 only preprocess; their plotted errors include measurement errors only.
 See [examples and all options](docs/guide/candidate.md).
 

@@ -12,7 +12,7 @@ from pentaceratops.evidence import evidence
 
 prepared, prepared_path = prepare_candidate("TOI-700.02", cache_dir="/path/to/cache")
 target = prepare_target(prepared, output_dir="/path/to/new_field")
-results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="marginalized", eb_eta=0.1)
 ```
 
 `prepare_candidate` resolves the ephemeris, downloads photometry when needed,
@@ -22,7 +22,7 @@ file. Unpack the pair as shown rather than passing the pair to `evidence`.
 Use your candidate identifier and cache directory in place of the example.
 This preparation step can be expensive; run real targets in a compute allocation.
 
-Use `likelihood="real"` for folded Real evidence. This is a direct Python
+Use `likelihood="subtracted"` for the subtracted likelihood; it is the default. This is a direct Python
 function: it accepts objects, returns a `RunResult`, and needs no JSON file or
 CSV export. The explicit import keeps the existing `pentaceratops.evidence`
 package and its low-level scenario modules available.
@@ -33,9 +33,9 @@ package and its low-level scenario modules available.
 
 | Input | Python type | Likelihood |
 | --- | --- | --- |
-| The result returned by `prepare_candidate`, or its saved `.npz` path | `RunResult`, or `str`/`Path` | Real or Fourier |
-| The dictionary returned by `load_folded_real` | `dict` of arrays | Real |
-| A folded Fourier object, or its saved directory | `FoldedFourierData`, or `str`/`Path` | Fourier |
+| The result returned by `prepare_candidate`, or its saved `.npz` path | `RunResult`, or `str`/`Path` | Subtracted or marginalized |
+| The dictionary returned by `load_folded_real` | `dict` of arrays | Subtracted |
+| A folded full-orbit object, or its saved directory | `FoldedFourierData`, or `str`/`Path` | Marginalized |
 
 `evidence` works out which one it was given; there is no format argument.
 
@@ -60,7 +60,7 @@ from pentaceratops.evidence import evidence
 
 prepared = RunResult.load("/path/to/cache/prepared/<candidate>_<hash>.npz")
 target = load_target("/path/to/new_field")
-results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="marginalized", eb_eta=0.1)
 ```
 
 `load_target` reads a directory previously written by `prepare_target`. It
@@ -69,7 +69,7 @@ light-curve script, create the field once with
 `target = prepare_target(prepared, output_dir="/path/to/new_field")`.
 
 You may also pass the saved NPZ path directly as the first argument to `evidence`.
-The same candidate preparation works with `likelihood="real"` or `"fourier"`;
+The same candidate preparation works with `likelihood="subtracted"` or `"marginalized"`;
 the evidence function constructs the corresponding covariance from its saved
 PSD and fit state. No preprocessing rerun is needed to switch likelihoods.
 
@@ -82,7 +82,7 @@ from pentaceratops import load_folded_real
 from pentaceratops.evidence import evidence
 
 prepared = load_folded_real("/path/to/prepared.npz", "/path/to/folded_posterior.npz")
-results = evidence(prepared, target=target, likelihood="real", eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="subtracted", eb_eta=0.1)
 ```
 
 ```python
@@ -91,10 +91,10 @@ from pentaceratops.evidence import evidence
 
 # Directory previously written by FoldedFourierData.save(...).
 prepared = FoldedFourierData.load("/path/to/folded_fourier")
-results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="marginalized", eb_eta=0.1)
 ```
 
-The paired Real files and folded Fourier directory are different formats from
+The paired subtracted-likelihood files and the folded full-orbit directory are different formats from
 the candidate-script bundle. See [folded HZ preparation](hz_runs.md) for how
 those likelihood-ready products are constructed.
 
@@ -122,8 +122,8 @@ If the population path is not attached to the object, pass
 prepared companion population. Candidate bundles must match the target ID
 and mission. Supplied objects are not modified.
 
-For candidate bundles, the function constructs the conditional Real covariance
-or full-orbit Fourier covariance from the saved PSD and fit state, without
+For candidate bundles, the function constructs the conditional covariance of the subtracted likelihood
+or the full-orbit covariance of the marginalized likelihood from the saved PSD and fit state, without
 rerunning detrending. Likelihood-ready dictionaries and folded objects bypass
 that step. See [covariance handling](evidence_command.md#what-happens-to-the-saved-photometry).
 
@@ -146,6 +146,10 @@ Resolved arguments, preparation metadata, source versions and hashes of the
 population and any loaded preparation files are retained in the result.
 
 ## Arguments
+
+`likelihood` is `"subtracted"` (the default) or `"marginalized"`; see
+[the two likelihoods](concepts/likelihoods.md). The earlier names `"real"` and
+`"fourier"` are accepted as aliases, and results record the new name.
 
 The explicit signature accepts `N`, `steps`, `nsamples`, `seed`,
 `posterior_samples`, `parity`, `eb_eta`, `scenarios`, `filt`,
@@ -174,14 +178,15 @@ and [full Fourier timing](evidence-fourier-benchmark-20261010.md) for complete
 33-scenario benchmarks of these defaults.
 
 Other defaults remain seed 42, 2000 posterior draws, profile parity, and eta=1.
-Exposure integration defaults to 20 subsamples for Real and 7 for Fourier. The example explicitly chooses the paper odds, eta=0.1.
+Exposure integration defaults to 20 subsamples for the subtracted likelihood and 7 for the marginalized one. The example explicitly chooses the paper odds, eta=0.1.
 
-Real-only options are `primary_only`, `include_gp` and `timing_policy`, defaulting
-to `False`, `True` and `"observed"`. Explicit false values are honored; these
-options are rejected for Fourier. Primary-only mode requires a matching
-likelihood-ready Real preparation and cannot discard a candidate bundle's
-secondary observations. Use `timing_policy="legacy"` for the archived Real
-timing rule. The existing ordinary-EB secondary penalty remains unchanged.
+`primary_only`, `include_gp` and `timing_policy` apply to the subtracted
+likelihood only, defaulting to `False`, `True` and `"observed"`. Explicit false
+values are honored; these options are rejected for the marginalized likelihood.
+Primary-only mode requires a matching likelihood-ready preparation and cannot
+discard a candidate bundle's secondary observations. Use
+`timing_policy="legacy"` for the archived timing rule of the subtracted
+likelihood. The existing ordinary-EB secondary penalty remains unchanged.
 
 `free_epoch` and `epoch_sigma` apply to both likelihoods. The epoch is fixed by
 default. With `free_epoch=True` every scenario samples one extra parameter, the transit time
@@ -194,7 +199,7 @@ With a fixed epoch a timing error of about a minute is absorbed by eccentricity
 at high SNR, so consider `free_epoch=True` for high-SNR candidates.
 The table gains `epoch_offset` and `epoch_offset_err` columns (posterior mean
 and standard deviation in days) and the records keep the offset samples as
-`epoch_offset` and `posterior_epoch_offset`. For Real, the offset moves the
+`epoch_offset` and `posterior_epoch_offset`. For the subtracted likelihood, the offset moves the
 modelled eclipses; the window-support tests and the centred no-secondary
 constraint keep their fixed-epoch form.
 

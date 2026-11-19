@@ -20,13 +20,13 @@ Each full-target timing is one measurement, not a repeated-run estimate.
 The new call is:
 
 ```python
-results = evidence(prepared, target=target, likelihood="real", eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="subtracted", eb_eta=0.1)
 ```
 
 To request the previous uniform effort explicitly:
 
 ```python
-results = evidence(prepared, target=target, likelihood="real", eb_eta=0.1,
+results = evidence(prepared, target=target, likelihood="subtracted", eb_eta=0.1,
                    N=500, steps=50)
 ```
 

@@ -7,7 +7,7 @@ offers two noise treatments, selected with the `likelihood` argument of
 
 | | Subtracted likelihood | Marginalized likelihood |
 | --- | --- | --- |
-| `likelihood=` | `"real"` | `"fourier"` |
+| `likelihood=` | `"subtracted"` | `"marginalized"` |
 | Stellar variability | Estimated and subtracted; its uncertainty in the folded windows is propagated | Integrated over, using its power spectrum |
 | Data used | Folded windows around the primary transit (even and odd) and the secondary phase | Every observed sample, folded at twice the candidate period |
 | Secondary eclipse away from phase 0.5 | Only if it falls inside the window | Anywhere in the orbit |
@@ -16,6 +16,12 @@ offers two noise treatments, selected with the `likelihood` argument of
 
 Both are built from the same preprocessing output, so a candidate prepared once
 can be run with either.
+
+!!! note "Earlier names"
+    The two values used to be `"real"` and `"fourier"`. Those names are still
+    accepted and mean the same thing; results record the new names. Some function and class
+    names keep the old words, for example `calc_probs_folded_real` and
+    `FoldedFourierData`.
 
 ## Subtracted likelihood
 

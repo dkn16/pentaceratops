@@ -170,3 +170,39 @@ def test_public_subtracted_run_with_a_free_epoch(tmp_path):
         assert np.all(abs(record["epoch_offset"]) < 8*.002)
         assert "epoch_offset" in record["bestfit"]["parameters"]
         assert record["bestfit"]["scalar_replay"] == pytest.approx(record["bestfit"]["log_target"], abs=2e-5)
+
+
+def test_paper_likelihood_names_and_their_earlier_aliases():
+    from pentaceratops.prepared import _options, likelihood_domain
+    assert likelihood_domain("subtracted") == likelihood_domain("real") == "real"
+    assert likelihood_domain("marginalized") == likelihood_domain("fourier") == "fourier"
+    for name in ("Subtracted", "marg", "", None, 3, ["real"]):
+        with pytest.raises(ValueError, match="subtracted"):
+            likelihood_domain(name)
+    assert _options("subtracted", {}) == _options("real", {})
+    assert _options("marginalized", {}) == _options("fourier", {})
+    assert _options("subtracted", {})["nsamples"] == 20 and _options("marginalized", {})["nsamples"] == 7
+    with pytest.raises(ValueError):
+        _options("marginalized", dict(primary_only=True))
+
+
+@pytest.mark.parametrize("name,alias", [("subtracted", "real"), ("marginalized", "fourier")])
+def test_evidence_records_the_paper_name_for_either_spelling(monkeypatch, tmp_path, name, alias):
+    from pentaceratops import hz
+    from pentaceratops.evidence import evidence
+    from test_prepared_command import prepared
+    from test_evidence_api import field
+    saved, _, _ = prepared(monkeypatch)
+    host = field(tmp_path)
+
+    def sample(adapter, scenario, star, **options):
+        return dict(lnBF=1., lnZ=2., null_loglike=1., N=options["N"], steps=options["steps"])
+    monkeypatch.setattr(hz, "sample_joint_scenario", sample)
+    tables = []
+    for spelling in (name, alias):
+        result = evidence(saved, target=host, likelihood=spelling)
+        assert result.metadata["evidence_call"]["likelihood"] == name
+        tables.append(result.output[["ID", "scenario", "lnBF", "prob"]])
+    assert tables[0].equals(tables[1])
+    with pytest.raises(ValueError, match="subtracted"):
+        evidence(saved, target=host, likelihood="windowed")

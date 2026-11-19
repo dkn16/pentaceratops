@@ -37,7 +37,7 @@ covariance, use the prepared-data interface:
 ```python
 from pentaceratops.evidence import evidence
 
-results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="marginalized", eb_eta=0.1)
 ```
 
 That interface already uses the same full-orbit data, model folding operator

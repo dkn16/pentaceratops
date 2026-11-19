@@ -290,7 +290,7 @@ prepared = RunResult(output, metadata=dict(
 prepared.save("prepared.npz")
 
 results = evidence(
-    prepared, target=target, likelihood="fourier", eb_eta=0.1,
+    prepared, target=target, likelihood="marginalized", eb_eta=0.1,
 )
 print(results.output[["ID", "scenario", "lnBF", "prob"]])
 print("FPP:", results.output.attrs["FPP"])
@@ -298,7 +298,7 @@ print("EB-only probability:", results.output.attrs["FPP_EB"])
 results.save("results_fourier.npz")
 ```
 
-Use `likelihood="real"` for the subtracted likelihood. The same `prepared`
+Use `likelihood="subtracted"` for the subtracted likelihood. The same `prepared`
 object supports both calls; no second PSD fit is needed. Saved result paths
 must be new because `RunResult.save()` does not overwrite existing files.
 
@@ -324,7 +324,7 @@ parameters in additional metadata if needed for later evaluation.
 | `window_durations` | `PreparationOptions` | Sets the primary/secondary half-window width in transit durations, capped below P/4 |
 | `fgp_iterations`, `fgp_cutoff_per_day` | `PreparationOptions` | Control the iterative variability fit and its frequency range |
 | Other known signals | `preprocess_blocks(..., companions=[...])` | Masks their transits before binning; pass additional `Candidate` objects in the same time frame |
-| `likelihood` | `evidence()` | `"real"`: subtracted likelihood; `"fourier"`: marginalized likelihood |
+| `likelihood` | `evidence()` | `"subtracted"` or `"marginalized"` |
 | `N`, `steps` | `evidence()` | Override sampler effort; omit them to use the existing per-scenario defaults |
 | `nsamples` | `evidence()` | Exposure-integration subsamples, not the number of posterior samples |
 | `seed` | `evidence()` | Controls inference randomness independently of the injection seed |

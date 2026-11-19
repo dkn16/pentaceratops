@@ -54,15 +54,15 @@ parameters, supply the table yourself as described in
 ```python
 from pentaceratops.evidence import evidence
 
-results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="marginalized", eb_eta=0.1)
 ```
 
 `likelihood` selects one of [the two likelihoods](concepts/likelihoods.md):
 
 | Value | Name in the paper | Use |
 | --- | --- | --- |
-| `"real"` | Subtracted likelihood | Faster; a good first assessment |
-| `"fourier"` | Marginalized likelihood | Accounts for uncertainty in the stellar variability; preferred for a final FPP |
+| `"subtracted"` | Subtracted likelihood | Faster; a good first assessment |
+| `"marginalized"` | Marginalized likelihood | Accounts for uncertainty in the stellar variability; preferred for a final FPP |
 
 The same `prepared` object works for both, so switching does not repeat the
 preprocessing.

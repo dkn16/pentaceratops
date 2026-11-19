@@ -4,7 +4,7 @@ Measured 2026-10-10 with the saved TOI-700.02 photometry and stellar field,
 using the shared scenario sampling defaults:
 
 ```python
-results = evidence(prepared, target=target, likelihood="fourier", eb_eta=0.1)
+results = evidence(prepared, target=target, likelihood="marginalized", eb_eta=0.1)
 ```
 
 All **33 scenarios** completed (15 target/background families plus three

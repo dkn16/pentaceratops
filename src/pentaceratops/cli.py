@@ -17,7 +17,8 @@ def main(argv=None):
     summary.add_argument("path")
     evidence = commands.add_parser("evidence", help="Run evidence from prepared files and a JSON configuration")
     evidence.add_argument("config", help="JSON configuration; relative input paths use its directory")
-    evidence.add_argument("--likelihood", choices=("real", "fourier"))
+    evidence.add_argument("--likelihood", choices=("subtracted", "marginalized", "real", "fourier"),
+                          help='"real" and "fourier" are earlier names of subtracted and marginalized')
     evidence.add_argument("--output", help="New result NPZ path, relative to the current directory")
     for name in ("N", "steps", "nsamples", "seed", "posterior-samples"):
         evidence.add_argument("--"+name, type=int, default=None)
